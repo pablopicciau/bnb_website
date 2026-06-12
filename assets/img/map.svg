@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" preserveAspectRatio="xMidYMid slice">
+  <rect width="800" height="800" fill="#f7f2ea"/>
+  <!-- strade stilizzate -->
+  <g stroke="#d9c8ab" stroke-width="26" fill="none" stroke-linecap="round">
+    <path d="M-20 200 Q 250 240 420 180 T 820 220"/>
+    <path d="M-20 420 Q 300 380 520 440 T 820 400"/>
+    <path d="M-20 640 Q 260 680 480 620 T 820 660"/>
+    <path d="M200 -20 Q 240 250 180 420 T 220 820"/>
+    <path d="M430 -20 Q 390 300 450 520 T 410 820"/>
+    <path d="M640 -20 Q 680 260 620 480 T 660 820"/>
+  </g>
+  <!-- isolati -->
+  <g fill="#efe6d8" stroke="#e0d2ba" stroke-width="2">
+    <rect x="250" y="250" width="120" height="110" rx="10"/>
+    <rect x="480" y="240" width="110" height="120" rx="10"/>
+    <rect x="260" y="470" width="110" height="120" rx="10"/>
+    <rect x="490" y="480" width="100" height="100" rx="10"/>
+  </g>
+  <!-- mare in basso -->
+  <path d="M0 740 Q 200 720 400 740 T 800 740 L800 800 L0 800 Z" fill="#14424f" opacity="0.85"/>
+  <!-- pin -->
+  <g>
+    <circle cx="400" cy="400" r="56" fill="#c4602e" opacity="0.15"/>
+    <path d="M400 320 c-36 0 -62 27 -62 60 c0 45 62 110 62 110 s62 -65 62 -110 c0 -33 -26 -60 -62 -60 z" fill="#c4602e"/>
+    <circle cx="400" cy="382" r="24" fill="#f7f2ea"/>
+    <text x="400" y="392" text-anchor="middle" font-family="Georgia, serif" font-size="26" font-weight="bold" fill="#c4602e">18</text>
+  </g>
+  <text x="400" y="540" text-anchor="middle" font-family="Georgia, serif" font-size="26" fill="#1f2933" opacity="0.7">Via Lamarmora 18 · Castello</text>
+</svg>
