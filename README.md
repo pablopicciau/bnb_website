@@ -27,8 +27,10 @@ llms.txt            Riassunto della struttura pensato per gli assistenti AI
    (formato JPG/WebP, ~1600px di larghezza per la hero, ~800px per le stanze)
    e aggiorna i percorsi nei due `index.html`. Aggiungi anche
    `assets/img/og-cover.jpg` (1200×630) per le anteprime sui social.
-3. **Numero WhatsApp** — sostituisci `390000000000` nei link `wa.me`
-   con il tuo numero reale (prefisso internazionale senza `+`).
+3. **Contatti** — email `meri.bnb.cagliari@gmail.com` e telefono
+   `+39 352 036 8357` (usato anche per i link `tel:` e WhatsApp `wa.me`).
+   Per cambiarli in futuro cerca queste stringhe in `index.html`,
+   `en/index.html` e `llms.txt`.
 4. **Coordinate GPS** — verifica latitudine/longitudine nei blocchi JSON-LD
    (attualmente 39.2183, 9.1164, stima per Via Lamarmora, Castello).
 5. **Nomi delle camere e testi** — "Camera Castello" e "Camera Marina" sono
