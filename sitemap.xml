@@ -2,19 +2,19 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://www.bblamarmora18.it/</loc>
+    <loc>https://www.meribnb.it/</loc>
     <lastmod>2026-06-12</lastmod>
     <changefreq>monthly</changefreq>
     <priority>1.0</priority>
-    <xhtml:link rel="alternate" hreflang="it" href="https://www.bblamarmora18.it/"/>
-    <xhtml:link rel="alternate" hreflang="en" href="https://www.bblamarmora18.it/en/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://www.meribnb.it/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.meribnb.it/en/"/>
   </url>
   <url>
-    <loc>https://www.bblamarmora18.it/en/</loc>
+    <loc>https://www.meribnb.it/en/</loc>
     <lastmod>2026-06-12</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
-    <xhtml:link rel="alternate" hreflang="it" href="https://www.bblamarmora18.it/"/>
-    <xhtml:link rel="alternate" hreflang="en" href="https://www.bblamarmora18.it/en/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://www.meribnb.it/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.meribnb.it/en/"/>
   </url>
 </urlset>

@@ -36,7 +36,7 @@
 
 ## Pagine / Pages
 
-- [Home (Italiano)](https://www.bblamarmora18.it/): pagina principale con
+- [Home (Italiano)](https://www.meribnb.it/): pagina principale con
   stanze, servizi, posizione, FAQ e contatti
-- [Home (English)](https://www.bblamarmora18.it/en/): main page with rooms,
+- [Home (English)](https://www.meribnb.it/en/): main page with rooms,
   amenities, location, FAQ and contact details

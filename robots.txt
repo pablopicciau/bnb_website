@@ -38,4 +38,4 @@ Allow: /
 User-agent: CCBot
 Allow: /
 
-Sitemap: https://www.bblamarmora18.it/sitemap.xml
+Sitemap: https://www.meribnb.it/sitemap.xml

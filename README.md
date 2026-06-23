@@ -19,9 +19,10 @@ llms.txt            Riassunto della struttura pensato per gli assistenti AI
 
 ## Cose da personalizzare prima di andare online
 
-1. **Dominio** — il sito usa `https://www.bblamarmora18.it/` come segnaposto.
-   Quando registri il dominio reale, cercalo e sostituiscilo in:
-   `index.html`, `en/index.html`, `sitemap.xml`, `robots.txt`, `llms.txt`.
+1. **Dominio** — il sito è configurato per `https://www.meribnb.it/`
+   (canonical, hreflang, Open Graph, sitemap, robots, llms.txt). Se cambi
+   dominio in futuro, cerca `meribnb.it` in `index.html`, `en/index.html`,
+   `sitemap.xml`, `robots.txt`, `llms.txt`.
 2. **Foto reali** — sostituisci i segnaposto SVG in `assets/img/`
    (`hero.svg`, `room-castello.svg`, `room-marina.svg`) con fotografie vere
    (formato JPG/WebP, ~1600px di larghezza per la hero, ~800px per le stanze)
