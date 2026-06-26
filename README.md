@@ -1,7 +1,7 @@
-# B&B Lamarmora 18 — Sito web
+# B&B Merì — Sito web
 
-Sito statico bilingue (italiano + inglese) per il B&B Lamarmora 18,
-Via Lamarmora 18, Cagliari. Nessuna dipendenza: solo HTML, CSS e
+Sito statico bilingue (italiano + inglese) per il B&B Merì,
+Via Alberto Lamarmora 18, Cagliari. Nessuna dipendenza: solo HTML, CSS e
 JavaScript vanilla.
 
 ## Struttura
@@ -33,7 +33,7 @@ llms.txt            Riassunto della struttura pensato per gli assistenti AI
    Per cambiarli in futuro cerca queste stringhe in `index.html`,
    `en/index.html` e `llms.txt`.
 4. **Coordinate GPS** — verifica latitudine/longitudine nei blocchi JSON-LD
-   (attualmente 39.2183, 9.1164, stima per Via Lamarmora, Castello).
+   (attualmente 39.2183, 9.1164, stima per Via Alberto Lamarmora, Castello).
 5. **Nomi delle camere e testi** — "Camera Castello" e "Camera Marina" sono
    proposte: cambiali liberamente, ricordando di aggiornare anche i JSON-LD.
 6. **Codici regionali** — se richiesto dalla normativa sarda, aggiungi nel

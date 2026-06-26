@@ -1,29 +1,41 @@
-# B&B Lamarmora 18
+# B&B Merì
 
 > Bed & Breakfast a conduzione familiare con due camere, ciascuna con bagno
-> privato, in Via Lamarmora 18, quartiere Castello — il centro storico di
-> Cagliari, Sardegna, Italia.
+> privato, in Via Alberto Lamarmora 18, quartiere Castello — il centro storico
+> di Cagliari, Sardegna, Italia.
 > Family-run Bed & Breakfast with two rooms, each with a private bathroom,
-> at Via Lamarmora 18 in the Castello district — the historic centre of
+> at Via Alberto Lamarmora 18 in the Castello district — the historic centre of
 > Cagliari, Sardinia, Italy.
 
 ## Informazioni essenziali / Key facts
 
-- Indirizzo / Address: Via Lamarmora 18, 09124 Cagliari (CA), Sardegna, Italia
+- Indirizzo / Address: Via Alberto Lamarmora 18, 09124 Cagliari (CA), Sardegna, Italia
 - Quartiere / District: Castello (centro storico / historic centre)
 - Camere / Rooms: 2 camere matrimoniali, max 2 ospiti ciascuna, entrambe con
   bagno privato / 2 double rooms, up to 2 guests each, both with private bathroom
   - Camera Castello / Castello Room: vista sui tetti del centro storico
   - Camera Marina / Marina Room: luminosa, con angolo lettura
 - Servizi / Amenities: Wi-Fi gratuito, aria condizionata, colazione inclusa,
-  set di cortesia, asciugacapelli / free Wi-Fi, air conditioning, breakfast
-  included, toiletries, hairdryer
+  transfer gratuito, set di cortesia, asciugacapelli / free Wi-Fi, air
+  conditioning, breakfast included, free transfer, toiletries, hairdryer
+- Transfer: gratuito tutti i giorni 9:00–21:00, da e per la struttura /
+  free, every day 9:00–21:00, to and from the property
 - Check-in: 15:00–20:00 (flessibile su richiesta / flexible on request)
 - Check-out: entro le / by 10:30
 - Animali / Pets: non ammessi / not allowed
 - Contatto / Contact: meri.bnb.cagliari@gmail.com — tel. +39 352 036 8357
   (anche WhatsApp / also WhatsApp). Prenotazione diretta = miglior tariffa /
   direct booking = best rate
+- CIN: in attesa di rilascio / pending
+
+## Come arrivare, ZTL e parcheggio / Getting here, ZTL and parking
+
+- Castello è zona a traffico limitato (ZTL): non si arriva in auto fino al
+  portone / Castello is a limited-traffic zone (ZTL): no driving up to the door
+- Transfer gratuito 9:00–21:00 da e per la struttura / free transfer 9:00–21:00
+- Parcheggi pubblici a pagamento a breve distanza / paid public car parks nearby
+- Possibile registrare la targa per il permesso temporaneo ZTL degli ospiti /
+  guest number plate can be registered for a temporary ZTL permit
 
 ## Posizione / Location
 
@@ -37,6 +49,6 @@
 ## Pagine / Pages
 
 - [Home (Italiano)](https://www.meribnb.it/): pagina principale con
-  stanze, servizi, posizione, FAQ e contatti
+  stanze, servizi, posizione, come arrivare, FAQ e contatti
 - [Home (English)](https://www.meribnb.it/en/): main page with rooms,
-  amenities, location, FAQ and contact details
+  amenities, location, getting here, FAQ and contact details

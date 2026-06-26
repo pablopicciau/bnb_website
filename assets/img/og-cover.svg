@@ -23,9 +23,9 @@
   <rect y="560" width="1200" height="70" fill="#0a252d"/>
   <!-- logo badge -->
   <rect x="120" y="120" width="92" height="92" rx="20" fill="#f7f2ea"/>
-  <text x="166" y="185" text-anchor="middle" font-family="Georgia, serif" font-size="48" font-weight="bold" fill="#14424f">18</text>
+  <text x="166" y="185" text-anchor="middle" font-family="Georgia, serif" font-size="50" font-weight="bold" fill="#14424f">M</text>
   <!-- testo -->
-  <text x="120" y="320" font-family="Georgia, serif" font-size="74" font-weight="600" fill="#f7f2ea">B&amp;B Lamarmora 18</text>
+  <text x="120" y="320" font-family="Georgia, serif" font-size="80" font-weight="600" fill="#f7f2ea">B&amp;B Merì</text>
   <text x="124" y="385" font-family="Arial, sans-serif" font-size="34" fill="#e8a87c">Bed &amp; Breakfast nel centro storico di Cagliari</text>
   <text x="124" y="455" font-family="Arial, sans-serif" font-size="27" fill="#cfdbdc">Due camere con bagno privato · Quartiere Castello</text>
 </svg>

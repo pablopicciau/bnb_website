@@ -1,4 +1,4 @@
-# B&B Lamarmora 18 — robots.txt
+# B&B Merì — robots.txt
 # Tutti i crawler sono benvenuti, inclusi i crawler AI.
 
 User-agent: *
