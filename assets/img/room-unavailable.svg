@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice">
+  <!-- Camera non disponibile: il gatto di casa dorme davanti alla porta -->
+  <rect width="800" height="600" fill="#efe6d8"/>
+  <g fill="#e6d9c3">
+    <rect x="40" y="60" width="120" height="44" rx="6"/>
+    <rect x="600" y="230" width="140" height="44" rx="6"/>
+    <rect x="80" y="300" width="100" height="40" rx="6"/>
+    <rect x="560" y="380" width="110" height="40" rx="6"/>
+  </g>
+  <!-- luna e stelle -->
+  <circle cx="660" cy="110" r="38" fill="#e8a87c"/>
+  <circle cx="678" cy="96" r="35" fill="#efe6d8"/>
+  <g fill="#c4602e" opacity=".7">
+    <circle cx="560" cy="80" r="3"/><circle cx="720" cy="190" r="2.5"/><circle cx="600" cy="160" r="2"/>
+  </g>
+  <!-- pavimento -->
+  <rect y="500" width="800" height="100" fill="#d9c8ab"/>
+  <!-- porta ad arco -->
+  <path d="M290 500V230a110 110 0 0 1 220 0v270z" fill="#f7f2ea"/>
+  <path d="M305 500V235a95 95 0 0 1 190 0v265z" fill="#c4602e"/>
+  <path d="M400 142v358" stroke="#a64c20" stroke-width="4"/>
+  <g fill="none" stroke="#a64c20" stroke-width="4">
+    <rect x="325" y="262" width="58" height="92" rx="8"/>
+    <rect x="417" y="262" width="58" height="92" rx="8"/>
+    <rect x="325" y="380" width="58" height="92" rx="8"/>
+    <rect x="417" y="380" width="58" height="92" rx="8"/>
+  </g>
+  <circle cx="484" cy="362" r="7" fill="#e8a87c"/>
+  <!-- cartellino "non disturbare" -->
+  <path d="M484 362l-16 28M484 362l16 28" stroke="#1f2933" stroke-width="2"/>
+  <rect x="448" y="388" width="72" height="42" rx="9" fill="#f7f2ea" stroke="#14424f" stroke-width="3"/>
+  <text x="484" y="416" text-anchor="middle" font-family="Georgia, serif" font-size="21" font-weight="bold" fill="#14424f">Zzz</text>
+  <!-- pianta -->
+  <path d="M175 500l-10-58h76l-10 58z" fill="#a64c20"/>
+  <g fill="#5f8a6b">
+    <ellipse cx="190" cy="420" rx="14" ry="34" transform="rotate(-25 190 420)"/>
+    <ellipse cx="216" cy="414" rx="14" ry="36" transform="rotate(20 216 414)"/>
+    <ellipse cx="203" cy="402" rx="12" ry="38"/>
+  </g>
+  <!-- zerbino -->
+  <rect x="285" y="506" width="230" height="28" rx="7" fill="#14424f"/>
+  <!-- gatto che dorme -->
+  <g fill="#4a5562">
+    <ellipse cx="415" cy="500" rx="64" ry="29"/>
+    <circle cx="352" cy="502" r="25"/>
+    <path d="M333 489l3-26 15 16z"/>
+    <path d="M354 479l15-16 2 26z"/>
+  </g>
+  <path d="M476 506q34 24-18 31q-52 4-84-7" stroke="#4a5562" stroke-width="14" fill="none" stroke-linecap="round"/>
+  <path d="M339 503q5 5 10 0M357 503q5 5 10 0" stroke="#f7f2ea" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+  <path d="M350 510h6l-3 4z" fill="#e8a87c"/>
+  <!-- Zzz -->
+  <g font-family="Georgia, serif" font-weight="bold" fill="#14424f">
+    <text x="318" y="462" font-size="22" opacity=".9">z</text>
+    <text x="292" y="428" font-size="30" opacity=".75">z</text>
+    <text x="258" y="384" font-size="42" opacity=".6">Z</text>
+  </g>
+</svg>

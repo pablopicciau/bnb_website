@@ -162,8 +162,8 @@
 <header class="site-header" id="top">
   <div class="container header-inner">
     <a href="#top" class="logo" aria-label="B&B Merì — home">
-      <span class="logo-mark">M</span>
-      <span class="logo-text">Merì <em>bed &amp; breakfast</em></span>
+      <img class="logo-mark" src="../assets/img/logo-mark.svg" alt="" width="46" height="46">
+      <span class="logo-text">Merì <em>Bed &amp; Breakfast · Cagliari</em></span>
     </a>
     <nav class="main-nav" aria-label="Main navigation">
       <button class="nav-toggle" aria-expanded="false" aria-controls="nav-menu" aria-label="Open menu">
@@ -189,6 +189,14 @@
     <div class="container hero-inner">
       <p class="hero-eyebrow">Bed &amp; Breakfast · Castello, Cagliari</p>
       <h1>Sleep in the ancient heart<br>of Cagliari</h1>
+      <a class="checkin-cta" href="https://form.jotform.com/262836960089066" target="_blank" rel="noopener">
+        <span class="checkin-icon" aria-hidden="true">🗝️</span>
+        <span class="checkin-text">
+          <strong>Online check-in</strong>
+          <small>Already booked? Register your details here before you arrive</small>
+        </span>
+        <span class="checkin-arrow" aria-hidden="true">→</span>
+      </a>
       <p class="hero-sub">
         Two rooms with private bathroom at Via Alberto Lamarmora 18, among the lanes of
         the Castello district. The Bastione di Saint Remy, the Cathedral and the city's
@@ -238,7 +246,7 @@
       <div class="rooms-grid">
 
         <article class="room-card">
-          <figure class="room-media">
+          <figure class="room-media room-gallery" data-gallery="assets/img/camera-matrimoniale" data-gallery-base="../assets/img/camera-matrimoniale/">
             <img src="../assets/img/room-castello.svg" alt="Double Room with private bathroom in the Castello district" width="800" height="600" loading="lazy">
           </figure>
           <div class="room-body">
@@ -260,8 +268,8 @@
 
         <article class="room-card room-card--full">
           <figure class="room-media">
-            <img src="../assets/img/room-marina.svg" alt="Room with kitchenette in the Castello district" width="800" height="600" loading="lazy">
-            <span class="room-badge">Fully booked</span>
+            <img src="../assets/img/room-unavailable.svg" alt="Room with kitchenette unavailable: the house cat is napping by the door" width="800" height="600" loading="lazy">
+            <span class="room-badge">Unavailable</span>
           </figure>
           <div class="room-body">
             <h3>Room with Kitchenette</h3>
@@ -276,7 +284,7 @@
               <li>Air conditioning and heating</li>
               <li>Fast free Wi-Fi</li>
             </ul>
-            <p class="room-unavailable">Currently unavailable</p>
+            <p class="room-unavailable">Currently unavailable — back soon!</p>
           </div>
         </article>
 
@@ -435,7 +443,7 @@
 <footer class="site-footer">
   <div class="container footer-inner">
     <div>
-      <p class="footer-logo">B&amp;B Merì</p>
+      <p class="footer-logo"><img src="../assets/img/logo-mark.svg" alt="" width="34" height="34"> B&amp;B Merì</p>
       <p>Via Alberto Lamarmora 18, 09124 Cagliari — Sardinia, Italy</p>
       <p><a href="mailto:meri.bnb.cagliari@gmail.com">meri.bnb.cagliari@gmail.com</a></p>
       <p><a href="tel:+393520368357">+39 352 036 8357</a></p>
@@ -448,6 +456,7 @@
       <a href="#location">Location</a>
       <a href="#getting-here">Getting here</a>
       <a href="#faq">FAQ</a>
+      <a href="https://form.jotform.com/262836960089066" target="_blank" rel="noopener">Online check-in</a>
       <a href="../" hreflang="it" lang="it">Italiano</a>
     </nav>
   </div>

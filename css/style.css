@@ -1,6 +1,7 @@
 /* ============================================================
-   B&B Lamarmora 18 — stylesheet
+   B&B Merì — stylesheet
    Palette mediterranea: sabbia, terracotta, blu profondo
+   (gli stessi colori del logo: arco di Castello + tramonto sul golfo)
    ============================================================ */
 
 :root {
@@ -135,27 +136,29 @@ h3 { font-size: 1.4rem; }
 }
 
 .logo-mark {
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  background: var(--sea);
-  color: var(--sand);
-  font-family: var(--font-display);
-  font-size: 1.15rem;
-  font-weight: 600;
+  display: block;
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
 }
 
 .logo-text {
   font-family: var(--font-display);
-  font-size: 1.15rem;
-  line-height: 1.1;
+  font-size: 1.65rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--sea);
+  letter-spacing: 0.01em;
 }
 .logo-text em {
   display: block;
-  font-style: italic;
-  font-size: 0.78rem;
+  margin-top: 0.3rem;
+  font-family: var(--font-body);
+  font-style: normal;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
   color: var(--terracotta);
 }
 
@@ -229,6 +232,51 @@ h3 { font-size: 1.4rem; }
   color: var(--terracotta);
   margin-bottom: 1.2rem;
 }
+
+/* Check-in online: grande pulsante sotto il titolo */
+.checkin-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.8rem;
+  padding: 1rem 1.5rem 1rem 1.2rem;
+  background: var(--sea);
+  color: var(--sand);
+  border-radius: 18px;
+  text-decoration: none;
+  box-shadow: 0 12px 30px rgba(13, 47, 57, 0.28);
+  transition: transform 0.15s ease, background 0.2s ease;
+}
+.checkin-cta:hover { background: var(--sea-deep); transform: translateY(-2px); }
+.checkin-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: var(--terracotta);
+  font-size: 1.6rem;
+  flex-shrink: 0;
+}
+.checkin-text strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 3.4vw, 2rem);
+  font-weight: 600;
+  line-height: 1.1;
+}
+.checkin-text small {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.92rem;
+  opacity: 0.85;
+}
+.checkin-arrow {
+  font-size: 1.7rem;
+  margin-left: 0.3rem;
+  transition: transform 0.2s ease;
+}
+.checkin-cta:hover .checkin-arrow { transform: translateX(5px); }
 
 .hero-sub {
   margin-top: 1.4rem;
@@ -327,7 +375,38 @@ h3 { font-size: 1.4rem; }
   border-radius: 999px;
 }
 
-.room-card--full .room-media img { filter: grayscale(0.45); opacity: 0.9; }
+/* Galleria foto camera (le foto si caricano da assets/img/camera-matrimoniale/) */
+.room-gallery .gallery-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(247, 242, 234, 0.92);
+  color: var(--sea);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+.room-gallery .gallery-prev { left: 0.8rem; }
+.room-gallery .gallery-next { right: 0.8rem; }
+.room-gallery .gallery-btn:hover { background: var(--white); }
+.gallery-count {
+  position: absolute;
+  right: 0.8rem;
+  bottom: 0.8rem;
+  background: rgba(13, 47, 57, 0.75);
+  color: var(--sand);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+}
+
+.room-card--full .room-badge { background: var(--terracotta); }
 .room-unavailable {
   margin-top: auto;
   font-weight: 600;
@@ -523,10 +602,13 @@ h3 { font-size: 1.4rem; }
 }
 
 .footer-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   font-family: var(--font-display);
-  font-size: 1.3rem;
+  font-size: 1.4rem;
   color: var(--white);
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.7rem;
 }
 
 .site-footer a { color: rgba(255, 255, 255, 0.85); text-decoration: none; }
@@ -580,6 +662,8 @@ h3 { font-size: 1.4rem; }
   .nav-toggle[aria-expanded="true"] span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
 
   .hero-media { opacity: 0.25; }
+  .checkin-cta { display: flex; width: 100%; }
+  .logo-text { font-size: 1.4rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

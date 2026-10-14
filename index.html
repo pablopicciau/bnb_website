@@ -162,8 +162,8 @@
 <header class="site-header" id="top">
   <div class="container header-inner">
     <a href="#top" class="logo" aria-label="B&B Merì — home">
-      <span class="logo-mark">M</span>
-      <span class="logo-text">Merì <em>bed &amp; breakfast</em></span>
+      <img class="logo-mark" src="assets/img/logo-mark.svg" alt="" width="46" height="46">
+      <span class="logo-text">Merì <em>Bed &amp; Breakfast · Cagliari</em></span>
     </a>
     <nav class="main-nav" aria-label="Navigazione principale">
       <button class="nav-toggle" aria-expanded="false" aria-controls="nav-menu" aria-label="Apri menu">
@@ -189,6 +189,14 @@
     <div class="container hero-inner">
       <p class="hero-eyebrow">Bed &amp; Breakfast · Castello, Cagliari</p>
       <h1>Dormi nel cuore antico<br>di Cagliari</h1>
+      <a class="checkin-cta" href="https://form.jotform.com/262836960089066" target="_blank" rel="noopener">
+        <span class="checkin-icon" aria-hidden="true">🗝️</span>
+        <span class="checkin-text">
+          <strong>Check-in online</strong>
+          <small>Hai già prenotato? Registra qui i tuoi dati prima dell'arrivo</small>
+        </span>
+        <span class="checkin-arrow" aria-hidden="true">→</span>
+      </a>
       <p class="hero-sub">
         Due camere con bagno privato in Via Alberto Lamarmora 18, tra i vicoli del
         quartiere Castello. Il Bastione di Saint Remy, la Cattedrale e i migliori
@@ -238,7 +246,7 @@
       <div class="rooms-grid">
 
         <article class="room-card">
-          <figure class="room-media">
+          <figure class="room-media room-gallery" data-gallery="assets/img/camera-matrimoniale" data-gallery-base="assets/img/camera-matrimoniale/">
             <img src="assets/img/room-castello.svg" alt="Camera Matrimoniale con bagno privato nel quartiere Castello" width="800" height="600" loading="lazy">
           </figure>
           <div class="room-body">
@@ -260,8 +268,8 @@
 
         <article class="room-card room-card--full">
           <figure class="room-media">
-            <img src="assets/img/room-marina.svg" alt="Camera con cucina nel quartiere Castello" width="800" height="600" loading="lazy">
-            <span class="room-badge">Al completo</span>
+            <img src="assets/img/room-unavailable.svg" alt="Camera con cucina non disponibile: il gatto di casa dorme davanti alla porta" width="800" height="600" loading="lazy">
+            <span class="room-badge">Non disponibile</span>
           </figure>
           <div class="room-body">
             <h3>Camera con Cucina</h3>
@@ -276,7 +284,7 @@
               <li>Aria condizionata e riscaldamento</li>
               <li>Wi-Fi veloce gratuito</li>
             </ul>
-            <p class="room-unavailable">Attualmente non disponibile</p>
+            <p class="room-unavailable">Attualmente non disponibile — torniamo presto!</p>
           </div>
         </article>
 
@@ -435,7 +443,7 @@
 <footer class="site-footer">
   <div class="container footer-inner">
     <div>
-      <p class="footer-logo">B&amp;B Merì</p>
+      <p class="footer-logo"><img src="assets/img/logo-mark.svg" alt="" width="34" height="34"> B&amp;B Merì</p>
       <p>Via Alberto Lamarmora 18, 09124 Cagliari — Sardegna, Italia</p>
       <p><a href="mailto:meri.bnb.cagliari@gmail.com">meri.bnb.cagliari@gmail.com</a></p>
       <p><a href="tel:+393520368357">+39 352 036 8357</a></p>
@@ -448,6 +456,7 @@
       <a href="#posizione">Posizione</a>
       <a href="#come-arrivare">Come arrivare</a>
       <a href="#faq">FAQ</a>
+      <a href="https://form.jotform.com/262836960089066" target="_blank" rel="noopener">Check-in online</a>
       <a href="en/" hreflang="en" lang="en">English</a>
     </nav>
   </div>
