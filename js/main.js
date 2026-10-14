@@ -1,4 +1,5 @@
 // B&B Merì — interazioni minime (menu mobile, galleria foto camere)
+// Usato da tutte le lingue (IT, EN, FR, ES).
 (function () {
   var toggle = document.querySelector('.nav-toggle');
   var menu = document.getElementById('nav-menu');
@@ -26,6 +27,12 @@
   var REPO = 'pablopicciau/bnb_website';
   var BRANCH = 'main';
   var IMAGE = /\.(jpe?g|png|webp|gif)$/i;
+  var LABELS = {
+    it: ['Foto precedente', 'Foto successiva'],
+    en: ['Previous photo', 'Next photo'],
+    fr: ['Photo précédente', 'Photo suivante'],
+    es: ['Foto anterior', 'Foto siguiente']
+  }[document.documentElement.lang] || ['Foto precedente', 'Foto successiva'];
 
   document.querySelectorAll('[data-gallery]').forEach(function (fig) {
     var folder = fig.getAttribute('data-gallery');   // percorso nel repo
@@ -72,7 +79,7 @@
         var b = document.createElement('button');
         b.type = 'button';
         b.className = 'gallery-btn gallery-' + dir;
-        b.setAttribute('aria-label', dir === 'prev' ? 'Foto precedente' : 'Foto successiva');
+        b.setAttribute('aria-label', LABELS[dir === 'prev' ? 0 : 1]);
         b.textContent = dir === 'prev' ? '‹' : '›';
         b.addEventListener('click', function () { show(i + (dir === 'prev' ? -1 : 1)); });
         fig.appendChild(b);

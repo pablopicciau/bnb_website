@@ -1,59 +1,68 @@
 # B&B Merì — Sito web
 
-Sito statico bilingue (italiano + inglese) per il B&B Merì,
-Via Alberto Lamarmora 18, Cagliari. Nessuna dipendenza: solo HTML, CSS e
-JavaScript vanilla.
+Sito statico in quattro lingue (italiano, inglese, francese, spagnolo) per il
+B&B Merì, Via Alberto Lamarmora 18, Cagliari. Nessuna dipendenza: solo HTML,
+CSS e JavaScript vanilla, pubblicato con GitHub Pages su
+`https://www.meribnb.it/`.
 
 ## Struttura
 
 ```
-index.html          Pagina principale (italiano)
-en/index.html       Versione inglese
-css/style.css       Stile del sito
-js/main.js          Menu mobile
-assets/img/         Immagini (segnaposto SVG da sostituire con foto reali)
-robots.txt          Autorizza i crawler dei motori di ricerca e delle AI
-sitemap.xml         Mappa del sito con varianti hreflang
-llms.txt            Riassunto della struttura pensato per gli assistenti AI
+index.html                    Home in italiano      ┐
+en/index.html                 Home in inglese       │ generate da
+fr/index.html                 Home in francese      │ tools/build_pages.py
+es/index.html                 Home in spagnolo      │
+sitemap.xml                   Mappa del sito        ┘
+tools/build_pages.py          Tutti i testi delle 4 lingue + generatore
+404.html                      Pagina "non trovata"
+css/style.css                 Stile del sito
+js/main.js                    Menu mobile e galleria foto
+assets/img/                   Logo, illustrazioni, immagini
+assets/img/camera-matrimoniale/   Foto della camera (vedi sotto)
+robots.txt                    Autorizza i crawler dei motori di ricerca e delle AI
+llms.txt                      Riassunto pensato per gli assistenti AI
+CNAME                         Dominio personalizzato per GitHub Pages
 ```
 
-## Cose da personalizzare prima di andare online
+## Modificare i testi
 
-1. **Dominio** — il sito è configurato per `https://www.meribnb.it/`
-   (canonical, hreflang, Open Graph, sitemap, robots, llms.txt). Se cambi
-   dominio in futuro, cerca `meribnb.it` in `index.html`, `en/index.html`,
-   `sitemap.xml`, `robots.txt`, `llms.txt`.
-2. **Foto reali** — sostituisci i segnaposto SVG in `assets/img/`
-   (`hero.svg`, `room-castello.svg`, `room-marina.svg`) con fotografie vere
-   (formato JPG/WebP, ~1600px di larghezza per la hero, ~800px per le stanze)
-   e aggiorna i percorsi nei due `index.html`. Aggiungi anche
-   `assets/img/og-cover.jpg` (1200×630) per le anteprime sui social.
-3. **Contatti** — email `meri.bnb.cagliari@gmail.com` e telefono
-   `+39 352 036 8357` (usato anche per i link `tel:` e WhatsApp `wa.me`).
-   Per cambiarli in futuro cerca queste stringhe in `index.html`,
-   `en/index.html` e `llms.txt`.
-4. **Coordinate GPS** — verifica latitudine/longitudine nei blocchi JSON-LD
-   (attualmente 39.2183, 9.1164, stima per Via Alberto Lamarmora, Castello).
-5. **Nomi delle camere e testi** — "Camera Castello" e "Camera Marina" sono
-   proposte: cambiali liberamente, ricordando di aggiornare anche i JSON-LD.
-6. **Codici regionali** — se richiesto dalla normativa sarda, aggiungi nel
-   footer il codice IUN/identificativo della struttura ricettiva.
+Le quattro home **non vanno modificate a mano**: tutti i testi stanno in
+`tools/build_pages.py`, una sezione per lingua. Dopo una modifica:
+
+```bash
+python3 tools/build_pages.py
+```
+
+Lo script rigenera `index.html`, `en/`, `fr/`, `es/` e `sitemap.xml`, così le
+lingue restano sempre allineate. Contatti, link del check-in e indirizzo sono
+in cima allo script (costanti `PHONE`, `WHATSAPP`, `EMAIL`, `CHECKIN_URL`).
+
+## Foto della Camera Matrimoniale
+
+Basta caricare le foto nella cartella `assets/img/camera-matrimoniale/`
+(anche dal sito di GitHub: *Add file → Upload files*). La galleria le mostra
+da sola, in ordine di nome file, in tutte le lingue. Dettagli nel file
+`LEGGIMI.md` dentro la cartella.
+
+## Da completare
+
+1. **CIN** — nel footer c'è un segnaposto (`IT092009XXXXXXXXX`): appena
+   rilasciato, sostituiscilo in `tools/build_pages.py` e rigenera.
+2. **Coordinate GPS** — nei dati strutturati c'è una stima
+   (39.2183, 9.1164): verificala in `structured_data()` dello script.
+3. **Copertina social** — `assets/img/og-cover.svg` funziona, ma una foto
+   JPG 1200×630 rende meglio su WhatsApp e Facebook.
 
 ## Ottimizzazione per motori di ricerca e AI
 
-- **Schema.org JSON-LD**: `BedAndBreakfast` (con camere, servizi, geo,
-  orari) e `FAQPage` su entrambe le pagine — è ciò che Google e gli
-  assistenti AI leggono per rispondere a "B&B a Cagliari centro".
+- **Schema.org JSON-LD**: `BedAndBreakfast` (camere, servizi, lingue,
+  posizione, orari) e `FAQPage` in ogni lingua.
 - **`llms.txt`**: riassunto in linguaggio naturale per i crawler AI.
 - **`robots.txt`**: autorizza esplicitamente GPTBot, ClaudeBot,
   PerplexityBot, Google-Extended e altri.
-- **hreflang** IT/EN, canonical, Open Graph, sitemap.
+- **hreflang** IT/EN/FR/ES, canonical, Open Graph, sitemap.
 
-## Pubblicazione
-
-Il sito è 100% statico: puoi pubblicarlo gratis con **GitHub Pages**
-(Settings → Pages → branch principale), oppure su Netlify / Cloudflare
-Pages. Per provarlo in locale:
+## Provare in locale
 
 ```bash
 python3 -m http.server 8000

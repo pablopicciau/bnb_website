@@ -3,18 +3,46 @@
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://www.meribnb.it/</loc>
-    <lastmod>2026-06-12</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="it" href="https://www.meribnb.it/"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://www.meribnb.it/en/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.meribnb.it/fr/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.meribnb.it/es/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.meribnb.it/"/>
   </url>
   <url>
     <loc>https://www.meribnb.it/en/</loc>
-    <lastmod>2026-06-12</lastmod>
+    <lastmod>2026-10-14</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
     <xhtml:link rel="alternate" hreflang="it" href="https://www.meribnb.it/"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://www.meribnb.it/en/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.meribnb.it/fr/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.meribnb.it/es/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.meribnb.it/"/>
+  </url>
+  <url>
+    <loc>https://www.meribnb.it/fr/</loc>
+    <lastmod>2026-10-14</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="it" href="https://www.meribnb.it/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.meribnb.it/en/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.meribnb.it/fr/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.meribnb.it/es/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.meribnb.it/"/>
+  </url>
+  <url>
+    <loc>https://www.meribnb.it/es/</loc>
+    <lastmod>2026-10-14</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="it" href="https://www.meribnb.it/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.meribnb.it/en/"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.meribnb.it/fr/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.meribnb.it/es/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.meribnb.it/"/>
   </url>
 </urlset>

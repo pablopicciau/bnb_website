@@ -1,41 +1,46 @@
 # B&B Merì
 
-> Bed & Breakfast a conduzione familiare con due camere, ciascuna con bagno
-> privato, in Via Alberto Lamarmora 18, quartiere Castello — il centro storico
-> di Cagliari, Sardegna, Italia.
-> Family-run Bed & Breakfast with two rooms, each with a private bathroom,
-> at Via Alberto Lamarmora 18 in the Castello district — the historic centre of
-> Cagliari, Sardinia, Italy.
+> Bed & Breakfast a conduzione familiare in Via Alberto Lamarmora 18, quartiere
+> Castello — il centro storico di Cagliari, Sardegna, Italia. Camere con bagno
+> privato. Sito disponibile in italiano, inglese, francese e spagnolo.
+> Family-run Bed & Breakfast at Via Alberto Lamarmora 18 in the Castello
+> district — the historic centre of Cagliari, Sardinia, Italy. Rooms with
+> private bathroom. Website in Italian, English, French and Spanish.
 
 ## Informazioni essenziali / Key facts
 
 - Indirizzo / Address: Via Alberto Lamarmora 18, 09124 Cagliari (CA), Sardegna, Italia
 - Quartiere / District: Castello (centro storico / historic centre)
-- Camere / Rooms: 2 camere matrimoniali, max 2 ospiti ciascuna, entrambe con
-  bagno privato / 2 double rooms, up to 2 guests each, both with private bathroom
-  - Camera Castello / Castello Room: vista sui tetti del centro storico
-  - Camera Marina / Marina Room: luminosa, con angolo lettura
-- Servizi / Amenities: Wi-Fi gratuito, aria condizionata, colazione inclusa,
-  transfer gratuito, set di cortesia, asciugacapelli / free Wi-Fi, air
-  conditioning, breakfast included, free transfer, toiletries, hairdryer
-- Transfer: gratuito tutti i giorni 9:00–21:00, da e per la struttura /
-  free, every day 9:00–21:00, to and from the property
-- Check-in: 15:00–20:00 (flessibile su richiesta / flexible on request)
+- Camere / Rooms:
+  - Camera Matrimoniale / Double Room: max 2 ospiti, bagno privato — prenotabile / bookable
+  - Camera con Cucina / Room with Kitchenette: attualmente non disponibile / currently unavailable
+- Servizi / Amenities: Wi-Fi gratuito, aria condizionata, acqua potabile dal
+  rubinetto, transfer su richiesta, set di cortesia, asciugacapelli / free
+  Wi-Fi, air conditioning, drinkable tap water, transfer on request,
+  toiletries, hairdryer
+- Colazione: non inclusa / Breakfast: not included
+- Check-in: 15:00–20:00 (check-in online: https://form.jotform.com/262836960089066)
 - Check-out: entro le / by 10:30
 - Animali / Pets: non ammessi / not allowed
-- Contatto / Contact: meri.bnb.cagliari@gmail.com — tel. +39 352 036 8357
-  (anche WhatsApp / also WhatsApp). Prenotazione diretta = miglior tariffa /
-  direct booking = best rate
+- Prenotazioni / Bookings: contatto diretto / direct contact —
+  telefono e WhatsApp / phone and WhatsApp +39 352 036 8357,
+  email meri.bnb.cagliari@gmail.com
 - CIN: in attesa di rilascio / pending
 
-## Come arrivare, ZTL e parcheggio / Getting here, ZTL and parking
+## Come arrivare / Getting here
 
-- Castello è zona a traffico limitato (ZTL): non si arriva in auto fino al
-  portone / Castello is a limited-traffic zone (ZTL): no driving up to the door
-- Transfer gratuito 9:00–21:00 da e per la struttura / free transfer 9:00–21:00
-- Parcheggi pubblici a pagamento a breve distanza / paid public car parks nearby
-- Possibile registrare la targa per il permesso temporaneo ZTL degli ospiti /
-  guest number plate can be registered for a temporary ZTL permit
+- Castello è zona a traffico limitato (ZTL) / Castello is a limited-traffic zone
+- Dall'aeroporto / From the airport: treno da Elmas Aeroporto alla stazione di
+  Cagliari in Piazza Matteotti (~10 min), poi bus CTM linea 7 che ferma davanti
+  a casa / train from Elmas Aeroporto to Cagliari station in Piazza Matteotti
+  (~10 min), then CTM bus line 7, which stops outside the B&B
+- Parcheggio gratuito più vicino / nearest free parking: Viale Buoncammino
+  (strisce bianche gratis, blu a pagamento / white lines free, blue lines paid)
+- Parcheggio coperto / covered car park: Viale Regina Elena 17, aperto 24h,
+  ~€1,70/ora, max ~€10/giorno; ascensori pubblici gratuiti verso Castello
+  (Saint Remy → Bastione di Saint Remy; ex Unione Sarda) / open 24h,
+  ~€1.70/hour, max ~€10/day; free public lifts up to Castello
+- Transfer su richiesta / transfer on request
 
 ## Posizione / Location
 
@@ -48,7 +53,7 @@
 
 ## Pagine / Pages
 
-- [Home (Italiano)](https://www.meribnb.it/): pagina principale con
-  stanze, servizi, posizione, come arrivare, FAQ e contatti
-- [Home (English)](https://www.meribnb.it/en/): main page with rooms,
-  amenities, location, getting here, FAQ and contact details
+- [Italiano](https://www.meribnb.it/)
+- [English](https://www.meribnb.it/en/)
+- [Français](https://www.meribnb.it/fr/)
+- [Español](https://www.meribnb.it/es/)
