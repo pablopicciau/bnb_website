@@ -9,6 +9,7 @@ Per cambiare qualcosa: modifica i testi e rilancia
 Lo script riscrive index.html, en/index.html, fr/index.html, es/index.html
 e sitemap.xml, cosi' le quattro versioni restano sempre allineate.
 """
+import hashlib
 import json
 from html import escape
 from pathlib import Path
@@ -511,6 +512,12 @@ def lang_href(current, target):
     return href or "./"
 
 
+def asset_version(rel_path):
+    """Impronta del file: cambia quando il file cambia, cosi' i browser
+    scaricano subito la versione nuova invece di usare quella in memoria."""
+    return hashlib.sha1((ROOT / rel_path).read_bytes()).hexdigest()[:8]
+
+
 def attr(text):
     return escape(text, quote=True)
 
@@ -649,7 +656,7 @@ def render(lang):
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{p}css/style.css">
+  <link rel="stylesheet" href="{p}css/style.css?v={asset_version("css/style.css")}">
 
   <!-- Dati strutturati: BedAndBreakfast -->
   <script type="application/ld+json">
@@ -860,7 +867,7 @@ def render(lang):
   </div>
 </footer>
 
-<script src="{p}js/main.js" defer></script>
+<script src="{p}js/main.js?v={asset_version("js/main.js")}" defer></script>
 </body>
 </html>
 """
