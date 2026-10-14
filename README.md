@@ -35,7 +35,8 @@ python3 tools/build_pages.py
 
 Lo script rigenera `index.html`, `en/`, `fr/`, `es/` e `sitemap.xml`, così le
 lingue restano sempre allineate. Contatti, link del check-in e indirizzo sono
-in cima allo script (costanti `PHONE`, `WHATSAPP`, `EMAIL`, `CHECKIN_URL`).
+in cima allo script (costanti `PHONE`, `WHATSAPP`, `EMAIL`, `CHECKIN_URL`,
+`CIN`).
 
 ## Foto della Camera Matrimoniale
 
@@ -46,11 +47,9 @@ da sola, in ordine di nome file, in tutte le lingue. Dettagli nel file
 
 ## Da completare
 
-1. **CIN** — nel footer c'è un segnaposto (`IT092009XXXXXXXXX`): appena
-   rilasciato, sostituiscilo in `tools/build_pages.py` e rigenera.
-2. **Coordinate GPS** — nei dati strutturati c'è una stima
+1. **Coordinate GPS** — nei dati strutturati c'è una stima
    (39.2183, 9.1164): verificala in `structured_data()` dello script.
-3. **Copertina social** — `assets/img/og-cover.svg` funziona, ma una foto
+2. **Copertina social** — `assets/img/og-cover.svg` funziona, ma una foto
    JPG 1200×630 rende meglio su WhatsApp e Facebook.
 
 ## Ottimizzazione per motori di ricerca e AI

@@ -23,6 +23,7 @@ TEL = "+393520368357"
 WHATSAPP = "393520368357"
 EMAIL = "meri.bnb.cagliari@gmail.com"
 CHECKIN_URL = "https://form.jotform.com/262836960089066"
+CIN = "IT092009C2000U6994"   # Codice Identificativo Nazionale della struttura
 STREET = "Via Alberto Lamarmora 18"
 MAPS_URL = "https://www.google.com/maps/search/?api=1&query=Via+Alberto+Lamarmora+18%2C+Cagliari"
 LASTMOD = "2026-10-14"
@@ -136,7 +137,6 @@ T = {
         "whatsapp_text": "Salve, vorrei prenotare al B&B Merì",
         "mail_subject": "Prenotazione B&B Merì",
         "address_line": "Via Alberto Lamarmora 18, 09124 Cagliari (CA) — Sardegna, Italia",
-        "cin_pending": "(in attesa di rilascio)",
         "footer_label": "Link del footer",
         "rights": "Tutti i diritti riservati",
         "ld_description": "Bed & Breakfast nel quartiere Castello, centro storico di Cagliari: camere con bagno privato, Wi-Fi gratuito, aria condizionata, acqua potabile dal rubinetto e transfer su richiesta.",
@@ -252,7 +252,6 @@ T = {
         "whatsapp_text": "Hello, I would like to book at B&B Merì",
         "mail_subject": "Booking — B&B Merì",
         "address_line": "Via Alberto Lamarmora 18, 09124 Cagliari (CA) — Sardinia, Italy",
-        "cin_pending": "(pending)",
         "footer_label": "Footer links",
         "rights": "All rights reserved",
         "ld_description": "Bed & Breakfast in the Castello district, the historic centre of Cagliari, Sardinia: rooms with private bathroom, free Wi-Fi, air conditioning, drinkable tap water and transfer on request.",
@@ -368,7 +367,6 @@ T = {
         "whatsapp_text": "Bonjour, je souhaite réserver au B&B Merì",
         "mail_subject": "Réservation — B&B Merì",
         "address_line": "Via Alberto Lamarmora 18, 09124 Cagliari (CA) — Sardaigne, Italie",
-        "cin_pending": "(en cours d'attribution)",
         "footer_label": "Liens du pied de page",
         "rights": "Tous droits réservés",
         "ld_description": "Chambres d'hôtes dans le quartier de Castello, centre historique de Cagliari (Sardaigne) : chambres avec salle de bains privative, Wi-Fi gratuit, climatisation, eau du robinet potable et transfert sur demande.",
@@ -483,7 +481,6 @@ T = {
         "whatsapp_text": "Hola, me gustaría reservar en el B&B Merì",
         "mail_subject": "Reserva — B&B Merì",
         "address_line": "Via Alberto Lamarmora 18, 09124 Cagliari (CA) — Cerdeña, Italia",
-        "cin_pending": "(en trámite)",
         "footer_label": "Enlaces del pie de página",
         "rights": "Todos los derechos reservados",
         "ld_description": "Bed & Breakfast en el barrio de Castello, centro histórico de Cagliari (Cerdeña): habitaciones con baño privado, Wi-Fi gratis, aire acondicionado, agua potable del grifo y traslado bajo petición.",
@@ -544,6 +541,7 @@ def structured_data(lang, t):
         "petsAllowed": False,
         "smokingAllowed": False,
         "availableLanguage": ["Italian", "English", "French", "Spanish"],
+        "identifier": {"@type": "PropertyValue", "propertyID": "CIN", "value": CIN},
         "address": {
             "@type": "PostalAddress",
             "streetAddress": STREET,
@@ -845,8 +843,7 @@ def render(lang):
       <p>{t["address_line"]}</p>
       <p><a href="tel:{TEL}">{PHONE_INTL}</a> · <a href="{attr(whatsapp)}" target="_blank" rel="noopener">WhatsApp</a></p>
       <p><a href="mailto:{EMAIL}">{EMAIL}</a></p>
-      <!-- TODO: sostituire con il CIN reale appena rilasciato -->
-      <p class="footer-cin">CIN: IT092009XXXXXXXXX <span>{t["cin_pending"]}</span></p>
+      <p class="footer-cin">CIN: {CIN}</p>
     </div>
     <nav aria-label="{attr(t["footer_label"])}">
       <a href="#{ids["rooms"]}">{nav["rooms"]}</a>
