@@ -1,0 +1,14 @@
+# ORDINE DELLE FOTO NELLA GALLERIA
+# Una foto per riga: la prima riga è la prima foto che si vede sul sito.
+# Per cambiare l'ordine sposta le righe. Quello dopo il simbolo # è solo
+# una nota per riconoscere la foto: puoi scrivere quello che vuoi.
+# Le foto caricate ma non elencate qui compaiono in fondo, da sole.
+
+file_00000000fc3881f4b83c3b7bc0432fc9.jpg   # camera intera, vista larga
+IMG-20261007-WA0036.jpg                     # letto e comodini
+file_00000000a1048246ab7bd8f2feb175b6.jpg   # tavolino, finestra e angolo caffè
+IMG-20260818-WA0034.jpg                     # letto visto di fronte
+IMG-20261007-WA0035.jpg                     # porta antica in legno
+IMG-20260620-WA0005.jpg                     # quadro luminoso di notte
+IMG-20260620-WA0027.jpg                     # bagno con doccia
+file_00000000545881f489d19ce6cf378508.jpg   # bagno con sanitari

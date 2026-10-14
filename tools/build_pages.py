@@ -130,7 +130,8 @@ T = {
         ],
         "contact_eyebrow": "Prenota",
         "contact_h2": "Contattaci direttamente per prenotare",
-        "contact_p": f"Chiamaci al <strong>{PHONE}</strong>, scrivici su WhatsApp allo stesso numero oppure via email: rispondiamo in giornata. Prenotando direttamente ottieni sempre la tariffa migliore.",
+        "discount": "−10% rispetto a Booking",
+        "contact_p": f"Per avere uno <strong>sconto del 10% rispetto alla tariffa di Booking</strong>, prenota chiamandoci al <strong>{PHONE}</strong>. Puoi anche scriverci su WhatsApp allo stesso numero oppure via email: rispondiamo in giornata.",
         "phone_label": PHONE,
         "whatsapp_text": "Salve, vorrei prenotare al B&B Merì",
         "mail_subject": "Prenotazione B&B Merì",
@@ -245,7 +246,8 @@ T = {
         ],
         "contact_eyebrow": "Book",
         "contact_h2": "Contact us directly to book",
-        "contact_p": f"Call us on <strong>{PHONE_INTL}</strong>, message us on WhatsApp at the same number or send us an email: we reply within the day. Booking directly always gets you the best rate.",
+        "discount": "10% off the Booking.com rate",
+        "contact_p": f"For a <strong>10% discount on the Booking.com rate</strong>, book by calling us on <strong>{PHONE_INTL}</strong>. You can also message us on WhatsApp at the same number or send us an email: we reply within the day.",
         "phone_label": PHONE_INTL,
         "whatsapp_text": "Hello, I would like to book at B&B Merì",
         "mail_subject": "Booking — B&B Merì",
@@ -360,7 +362,8 @@ T = {
         ],
         "contact_eyebrow": "Réserver",
         "contact_h2": "Contactez-nous directement pour réserver",
-        "contact_p": f"Appelez-nous au <strong>{PHONE_INTL}</strong>, écrivez-nous sur WhatsApp au même numéro ou envoyez-nous un e-mail : nous répondons dans la journée. En réservant en direct, vous obtenez toujours le meilleur tarif.",
+        "discount": "−10 % par rapport à Booking",
+        "contact_p": f"Pour bénéficier d'une <strong>remise de 10 % par rapport au tarif Booking</strong>, réservez en nous appelant au <strong>{PHONE_INTL}</strong>. Vous pouvez aussi nous écrire sur WhatsApp au même numéro ou par e-mail : nous répondons dans la journée.",
         "phone_label": PHONE_INTL,
         "whatsapp_text": "Bonjour, je souhaite réserver au B&B Merì",
         "mail_subject": "Réservation — B&B Merì",
@@ -474,7 +477,8 @@ T = {
         ],
         "contact_eyebrow": "Reservar",
         "contact_h2": "Contáctanos directamente para reservar",
-        "contact_p": f"Llámanos al <strong>{PHONE_INTL}</strong>, escríbenos por WhatsApp al mismo número o envíanos un e-mail: respondemos en el día. Reservando directamente consigues siempre la mejor tarifa.",
+        "discount": "−10 % respecto a Booking",
+        "contact_p": f"Para obtener un <strong>descuento del 10 % sobre la tarifa de Booking</strong>, reserva llamándonos al <strong>{PHONE_INTL}</strong>. También puedes escribirnos por WhatsApp al mismo número o por e-mail: respondemos en el día.",
         "phone_label": PHONE_INTL,
         "whatsapp_text": "Hola, me gustaría reservar en el B&B Merì",
         "mail_subject": "Reserva — B&B Merì",
@@ -821,6 +825,7 @@ def render(lang):
     <div class="container narrow center">
       <p class="eyebrow">{t["contact_eyebrow"]}</p>
       <h2>{t["contact_h2"]}</h2>
+      <p class="discount-pill">{t["discount"]}</p>
       <p>{t["contact_p"]}</p>
       <div class="contact-actions">
         <a class="btn btn-primary btn-lg" href="tel:{TEL}">📞 {t["phone_label"]}</a>

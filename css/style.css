@@ -383,6 +383,11 @@ h3 { font-size: 1.4rem; }
 }
 
 /* Galleria foto camera (le foto si caricano da assets/img/camera-matrimoniale/) */
+/* Foto intere, senza tagli: quelle verticali hanno bande ai lati */
+.room-gallery img {
+  object-fit: contain;
+  background: var(--sand-deep);
+}
 .room-gallery .gallery-btn {
   position: absolute;
   top: 50%;
@@ -577,6 +582,18 @@ h3 { font-size: 1.4rem; }
 .footer-cin span { opacity: 0.7; }
 
 /* ---------- Contact ---------- */
+
+.discount-pill {
+  display: inline-block;
+  margin: 0.2rem 0 1.2rem;
+  padding: 0.45rem 1.1rem;
+  border-radius: 999px;
+  background: var(--terracotta);
+  color: var(--white);
+  font-weight: 600;
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+}
 
 .contact-actions {
   margin-top: 2rem;

@@ -22,7 +22,8 @@
 // Galleria: mostra tutte le foto presenti nella cartella indicata da
 // data-gallery (es. assets/img/camera-matrimoniale/). L'elenco dei file
 // arriva dall'API pubblica di GitHub, quindi basta caricare le foto nella
-// cartella: niente nomi obbligatori. Senza foto resta l'illustrazione.
+// cartella: niente nomi obbligatori. L'ordine si decide in ordine.txt
+// nella stessa cartella. Senza foto resta l'illustrazione.
 (function () {
   var REPO = 'pablopicciau/bnb_website';
   var BRANCH = 'main';
@@ -40,18 +41,42 @@
     var img = fig.querySelector('img');
     if (!img || !window.fetch) return;
 
-    fetch('https://api.github.com/repos/' + REPO + '/contents/' + folder + '?ref=' + BRANCH)
-      .then(function (res) { return res.ok ? res.json() : []; })
-      .then(function (files) {
-        var photos = (Array.isArray(files) ? files : [])
+    var list = fetch('https://api.github.com/repos/' + REPO + '/contents/' + folder + '?ref=' + BRANCH)
+      .then(function (res) { return res.ok ? res.json() : []; });
+    // ordine.txt (facoltativo): un nome di file per riga, nell'ordine voluto;
+    // quello dopo "#" e' un commento. Il parametro evita la versione in cache.
+    var order = fetch(base + 'ordine.txt?t=' + Date.now())
+      .then(function (res) { return res.ok ? res.text() : ''; })
+      .catch(function () { return ''; });
+
+    Promise.all([list, order])
+      .then(function (r) {
+        var files = r[0], wanted = parseOrder(r[1]);
+        var names = (Array.isArray(files) ? files : [])
           .filter(function (f) { return f.type === 'file' && IMAGE.test(f.name); })
           .map(function (f) { return f.name; })
-          .sort(function (a, b) { return a.localeCompare(b, undefined, { numeric: true }); })
-          .map(function (name) { return base + encodeURIComponent(name); });
+          .sort(function (a, b) {
+            var ia = rank(wanted, a), ib = rank(wanted, b);
+            return ia !== ib ? ia - ib : a.localeCompare(b, undefined, { numeric: true });
+          });
+        var photos = names.map(function (name) { return base + encodeURIComponent(name); });
         if (photos.length) start(fig, img, photos);
       })
       .catch(function () { /* resta l'illustrazione */ });
   });
+
+  // Nomi elencati in ordine.txt, in minuscolo (le maiuscole non contano)
+  function parseOrder(text) {
+    return text.split(/\r?\n/)
+      .map(function (line) { return line.split('#')[0].trim().toLowerCase(); })
+      .filter(Boolean);
+  }
+
+  // Posizione nell'elenco; le foto non elencate vanno in fondo
+  function rank(wanted, name) {
+    var i = wanted.indexOf(name.toLowerCase());
+    return i === -1 ? wanted.length : i;
+  }
 
   function start(fig, img, photos) {
     var i = 0;
