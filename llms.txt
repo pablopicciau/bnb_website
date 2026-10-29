@@ -36,13 +36,32 @@
   Cagliari in Piazza Matteotti (~10 min), poi bus CTM linea 7 che ferma davanti
   a casa / train from Elmas Aeroporto to Cagliari station in Piazza Matteotti
   (~10 min), then CTM bus line 7, which stops outside the B&B
-- Parcheggio gratuito più vicino / nearest free parking: Viale Buoncammino
-  (strisce bianche gratis, blu a pagamento / white lines free, blue lines paid)
-- Parcheggio coperto / covered car park: Viale Regina Elena 17, aperto 24h,
-  ~€1,70/ora, max ~€10/giorno; ascensori pubblici gratuiti verso Castello
-  (Saint Remy → Bastione di Saint Remy; ex Unione Sarda) / open 24h,
-  ~€1.70/hour, max ~€10/day; free public lifts up to Castello
+- In auto / By car: non entrare in Castello e non impostare l'indirizzo del B&B
+  nel navigatore (ZTL con telecamere): impostare il parcheggio / don't drive
+  into Castello or put the B&B address in the sat-nav (ZTL with cameras):
+  set the car park instead
 - Transfer su richiesta / transfer on request
+
+## Parcheggi / Parking (verificato ottobre 2026 / checked October 2026)
+
+Guida completa / full guide: https://www.meribnb.it/parcheggi/ (EN:
+https://www.meribnb.it/en/parking/)
+
+- Gratis / Free: Viale Buoncammino, strisce bianche / white lines, vicino a
+  Porta Cristina; ~10 min a piedi quasi in piano / ~10 min mostly flat walk
+- Strisce blu / Blue lines: a pagamento lun–sab 9–13 e 16–20 (~€1/ora, max
+  ~€10/giorno); gratis domenica, festivi, 13–16 e 20–9 / paid Mon–Sat 9–13 and
+  16–20; free Sundays, holidays, 13–16 and 20–9
+- Area Regina Elena Alta (APCOA, stalli blu / blue spaces): €0,50 prima ora,
+  poi €1/ora, max €2,50/giorno / €0.50 first hour, then €1/hour, max €2.50/day
+- Aree Regina Elena Bassa 1 e 2 (APCOA): max €8 e €7,50 al giorno / per day
+- Multipiano coperto / covered multi-storey car park Regina Elena (APCOA),
+  Viale Regina Elena 17, 24h: ~€1,70/ora, max €10/giorno / ~€1.70/hour,
+  max €10/day
+- Ascensori pubblici gratuiti / free public lifts: ex Unione Sarda (Viale
+  Regina Elena → Terrapieno → Piazza Palazzo, accanto alla Cattedrale / next to
+  the Cathedral); Saint Remy (Viale Regina Elena → Bastione di Saint Remy).
+  D'estate possono fermarsi nelle ore calde / may stop in the hottest hours
 
 ## Posizione / Location
 
@@ -55,7 +74,9 @@
 
 ## Pagine / Pages
 
-- [Italiano](https://www.meribnb.it/)
-- [English](https://www.meribnb.it/en/)
-- [Français](https://www.meribnb.it/fr/)
-- [Español](https://www.meribnb.it/es/)
+- Home: [Italiano](https://www.meribnb.it/) · [English](https://www.meribnb.it/en/) ·
+  [Français](https://www.meribnb.it/fr/) · [Español](https://www.meribnb.it/es/)
+- Guida ai parcheggi / Parking guide: [Italiano](https://www.meribnb.it/parcheggi/) ·
+  [English](https://www.meribnb.it/en/parking/) ·
+  [Français](https://www.meribnb.it/fr/stationnement/) ·
+  [Español](https://www.meribnb.it/es/aparcamiento/)

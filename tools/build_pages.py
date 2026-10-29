@@ -6,14 +6,17 @@ Per cambiare qualcosa: modifica i testi e rilancia
 
     python3 tools/build_pages.py
 
-Lo script riscrive index.html, en/index.html, fr/index.html, es/index.html
-e sitemap.xml, cosi' le quattro versioni restano sempre allineate.
+Lo script riscrive la home (index.html, en/, fr/, es/), la guida ai
+parcheggi (parcheggi/, en/parking/, fr/stationnement/, es/aparcamiento/)
+e sitemap.xml, cosi' le quattro lingue restano sempre allineate.
 """
 import hashlib
 import json
-from html import escape
+import posixpath
+import re
+from html import escape, unescape
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, quote_plus
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -27,7 +30,7 @@ CHECKIN_URL = "https://form.jotform.com/262836960089066"
 CIN = "IT092009C2000U6994"   # Codice Identificativo Nazionale della struttura
 STREET = "Via Alberto Lamarmora 18"
 MAPS_URL = "https://www.google.com/maps/search/?api=1&query=Via+Alberto+Lamarmora+18%2C+Cagliari"
-LASTMOD = "2026-10-14"
+LASTMOD = "2026-10-29"
 
 LANGS = ["it", "en", "fr", "es"]
 
@@ -46,7 +49,7 @@ T = {
         "og_description": "Camere con bagno privato nel quartiere Castello, centro storico di Cagliari. A pochi passi dal Bastione di Saint Remy.",
         "ids": {"rooms": "stanze", "amenities": "servizi", "location": "posizione",
                 "arrival": "come-arrivare", "faq": "faq", "contact": "contatti"},
-        "nav": {"rooms": "Le Stanze", "amenities": "Servizi", "location": "Posizione",
+        "nav": {"rooms": "Le Stanze", "amenities": "Servizi", "location": "Posizione", "parking": "Parcheggi",
                 "arrival": "Come arrivare", "faq": "FAQ", "book": "Prenota"},
         "nav_label": "Navigazione principale",
         "menu_open": "Apri menu",
@@ -108,21 +111,20 @@ T = {
                       ("Aeroporto di Cagliari-Elmas", "15 min in auto")],
         "maps_button": "Apri in Google Maps",
         "arr_eyebrow": "Come arrivare",
-        "arr_h2": "Aeroporto, auto e parcheggi",
+        "arr_h2": "Aeroporto, treno e auto",
         "arr_intro": "Castello è una <strong>zona a traffico limitato (ZTL)</strong>: in auto non si arriva fino al portone. Ecco i modi più comodi per raggiungerci.",
         "arrival": [
             ("✈️", "Dall'aeroporto in treno", "Dalla stazione Elmas Aeroporto, a pochi passi dal terminal, il treno vi porta in circa 10 minuti alla stazione di Cagliari in <strong>Piazza Matteotti</strong> (biglietto circa €1,30, una corsa ogni 20 minuti circa)."),
             ("🚌", "Poi il bus 7", "Davanti alla stazione prendete il bus CTM <strong>linea 7</strong>: sale in Castello e ferma proprio davanti a casa."),
-            ("🅿️", "In auto: parcheggio gratuito", "Il più vicino è in <strong>Viale Buoncammino</strong>, sul lato panoramico con vista sulla città: le strisce bianche sono gratuite, quelle <strong>blu sono a pagamento</strong>."),
-            ("🏢", "In auto: parcheggio Regina Elena", "Parcheggio coperto in <strong>Viale Regina Elena 17</strong>, aperto 24 ore su 24: circa €1,70 l'ora, massimo <strong>€10 al giorno</strong>. Da qui si sale in Castello con gli <strong>ascensori pubblici gratuiti</strong> di Viale Regina Elena: quello di <strong>Saint Remy</strong>, nei giardini sotto le mura a circa 100 m da Piazza Costituzione, che porta al Bastione di Saint Remy, e quelli dell'<strong>ex Unione Sarda</strong>, che salgono verso il quartiere."),
+            ("🅿️", "Arrivi in auto? Ecco dove parcheggiare", "Castello è ZTL: lasciate l'auto fuori dal quartiere. Il parcheggio gratuito più vicino è in <strong>Viale Buoncammino</strong>; a pagamento ci sono le aree e il multipiano di <strong>Viale Regina Elena</strong>, collegati a Castello da ascensori pubblici. <a class=\"text-link\" href=\"{parking}\">Leggi la guida completa ai parcheggi, con mappe e tariffe →</a>"),
             ("🚐", "Transfer su richiesta", "Preferite essere accompagnati? Organizziamo il transfer da e per la struttura: chiedetecelo in anticipo."),
         ],
-        "arr_note": "Tariffe e orari (anche degli ascensori, che d'estate possono fermarsi nelle ore più calde) sono indicativi: verificateli prima del viaggio.",
+        "arr_note": "Orari e tariffe sono indicativi: verificateli prima del viaggio.",
         "faq_eyebrow": "Domande frequenti",
         "faq_h2": "Buono a sapersi",
         "faq": [
             ("Come arrivo dall'aeroporto?", "In treno da Elmas Aeroporto alla stazione di Cagliari in Piazza Matteotti (circa 10 minuti), poi bus CTM linea 7, che ferma proprio davanti a casa."),
-            ("Castello è ZTL? Dove parcheggio?", "Sì, Castello è zona a traffico limitato. Il parcheggio gratuito più vicino è in Viale Buoncammino (strisce bianche; quelle blu sono a pagamento). In alternativa c'è il parcheggio coperto di Viale Regina Elena (circa €1,70 l'ora, massimo €10 al giorno), collegato a Castello dagli ascensori pubblici gratuiti."),
+            ("Castello è ZTL? Dove parcheggio?", "Sì, Castello è zona a traffico limitato: non entrate in auto nel quartiere. Il parcheggio gratuito più vicino è in Viale Buoncammino; a pagamento ci sono le aree e il multipiano di Viale Regina Elena, collegati a Castello da ascensori pubblici. Tutti i dettagli, con mappe e tariffe, sono nella nostra guida ai parcheggi: https://www.meribnb.it/parcheggi/"),
             ("Il transfer è disponibile?", "Sì, su richiesta: scriveteci in anticipo per organizzarlo."),
             ("L'acqua del rubinetto è potabile?", "Sì, l'acqua del rubinetto è potabile: fresca e buona da bere."),
             ("A che ora sono il check-in e il check-out?", "Il check-in è dalle 15:00 alle 20:00; per orari diversi basta avvisarci. Il check-out è entro le 10:30. Potete fare il check-in online in anticipo dal pulsante in cima alla pagina."),
@@ -161,7 +163,7 @@ T = {
         "og_description": "Rooms with private bathroom in the Castello district, Cagliari's historic centre. Steps from the Bastione di Saint Remy.",
         "ids": {"rooms": "rooms", "amenities": "amenities", "location": "location",
                 "arrival": "getting-here", "faq": "faq", "contact": "contact"},
-        "nav": {"rooms": "Rooms", "amenities": "Amenities", "location": "Location",
+        "nav": {"rooms": "Rooms", "amenities": "Amenities", "location": "Location", "parking": "Parking",
                 "arrival": "Getting here", "faq": "FAQ", "book": "Book"},
         "nav_label": "Main navigation",
         "menu_open": "Open menu",
@@ -223,21 +225,20 @@ T = {
                       ("Cagliari-Elmas Airport", "15 min by car")],
         "maps_button": "Open in Google Maps",
         "arr_eyebrow": "Getting here",
-        "arr_h2": "Airport, car and parking",
+        "arr_h2": "Airport, train and car",
         "arr_intro": "Castello is a <strong>limited-traffic zone (ZTL)</strong>: you can't drive up to the front door. Here are the easiest ways to reach us.",
         "arrival": [
             ("✈️", "From the airport by train", "From Elmas Aeroporto station, a short walk from the terminal, the train takes you in about 10 minutes to Cagliari station in <strong>Piazza Matteotti</strong> (ticket about €1.30, a train roughly every 20 minutes)."),
             ("🚌", "Then bus no. 7", "In front of the station, take CTM bus <strong>line 7</strong>: it climbs up to Castello and stops right outside our door."),
-            ("🅿️", "By car: free parking", "The nearest free parking is on <strong>Viale Buoncammino</strong>, on the panoramic side overlooking the city: white lines are free, <strong>blue lines are paid</strong>."),
-            ("🏢", "By car: Regina Elena car park", "Covered car park at <strong>Viale Regina Elena 17</strong>, open 24/7: about €1.70 per hour, <strong>€10 per day</strong> maximum. From there, go up to Castello with the <strong>free public lifts</strong> on Viale Regina Elena: the <strong>Saint Remy</strong> lift, in the gardens below the walls about 100 m from Piazza Costituzione, which takes you to the Bastione di Saint Remy, and the <strong>former Unione Sarda</strong> lifts, which climb up to the quarter."),
+            ("🅿️", "Coming by car? Here's where to park", "Castello is a ZTL: leave the car outside the quarter. The nearest free parking is on <strong>Viale Buoncammino</strong>; paid options are the street areas and the multi-storey car park on <strong>Viale Regina Elena</strong>, linked to Castello by public lifts. <a class=\"text-link\" href=\"{parking}\">Read our full parking guide, with maps and prices →</a>"),
             ("🚐", "Transfer on request", "Rather be picked up? We can arrange a transfer to and from the property: just ask us in advance."),
         ],
-        "arr_note": "Prices and times (including the lifts, which in summer may pause during the hottest hours) are indicative: please check them before you travel.",
+        "arr_note": "Times and prices are indicative: please check them before you travel.",
         "faq_eyebrow": "Frequently asked questions",
         "faq_h2": "Good to know",
         "faq": [
             ("How do I get there from the airport?", "By train from Elmas Aeroporto to Cagliari station in Piazza Matteotti (about 10 minutes), then CTM bus line 7, which stops right outside our door."),
-            ("Is Castello a ZTL? Where can I park?", "Yes, Castello is a limited-traffic zone. The nearest free parking is on Viale Buoncammino (white lines; blue lines are paid). Alternatively there is the covered car park on Viale Regina Elena (about €1.70 per hour, €10 per day maximum), connected to Castello by free public lifts."),
+            ("Is Castello a ZTL? Where can I park?", "Yes, Castello is a limited-traffic zone: please don't drive into the quarter. The nearest free parking is on Viale Buoncammino; paid options are the street areas and the multi-storey car park on Viale Regina Elena, linked to Castello by public lifts. All the details, with maps and prices, are in our parking guide: https://www.meribnb.it/en/parking/"),
             ("Is a transfer available?", "Yes, on request: write to us in advance to arrange it."),
             ("Is the tap water drinkable?", "Yes, the tap water is drinkable: fresh and good to drink."),
             ("What are the check-in and check-out times?", "Check-in is from 3:00 PM to 8:00 PM; just let us know if you need a different time. Check-out is by 10:30 AM. You can complete online check-in in advance using the button at the top of the page."),
@@ -276,7 +277,7 @@ T = {
         "og_description": "Chambres avec salle de bains privative dans le quartier de Castello, centre historique de Cagliari. À deux pas du Bastion de Saint-Remy.",
         "ids": {"rooms": "chambres", "amenities": "services", "location": "emplacement",
                 "arrival": "acces", "faq": "faq", "contact": "contact"},
-        "nav": {"rooms": "Chambres", "amenities": "Services", "location": "Emplacement",
+        "nav": {"rooms": "Chambres", "amenities": "Services", "location": "Emplacement", "parking": "Parkings",
                 "arrival": "Accès", "faq": "FAQ", "book": "Réserver"},
         "nav_label": "Navigation principale",
         "menu_open": "Ouvrir le menu",
@@ -338,21 +339,20 @@ T = {
                       ("Aéroport de Cagliari-Elmas", "15 min en voiture")],
         "maps_button": "Ouvrir dans Google Maps",
         "arr_eyebrow": "Accès",
-        "arr_h2": "Aéroport, voiture et parkings",
+        "arr_h2": "Aéroport, train et voiture",
         "arr_intro": "Castello est une <strong>zone à trafic limité (ZTL)</strong> : impossible d'arriver en voiture jusqu'à la porte. Voici les moyens les plus simples de nous rejoindre.",
         "arrival": [
             ("✈️", "Depuis l'aéroport en train", "Depuis la gare Elmas Aeroporto, à quelques pas du terminal, le train vous amène en 10 minutes environ à la gare de Cagliari, <strong>Piazza Matteotti</strong> (billet d'environ 1,30 €, un train toutes les 20 minutes environ)."),
             ("🚌", "Puis le bus n° 7", "Devant la gare, prenez le bus CTM <strong>ligne 7</strong> : il monte à Castello et s'arrête juste devant chez nous."),
-            ("🅿️", "En voiture : parking gratuit", "Le plus proche se trouve sur le <strong>Viale Buoncammino</strong>, côté panoramique avec vue sur la ville : les lignes blanches sont gratuites, les <strong>lignes bleues sont payantes</strong>."),
-            ("🏢", "En voiture : parking Regina Elena", "Parking couvert au <strong>Viale Regina Elena 17</strong>, ouvert 24 h/24 : environ 1,70 € de l'heure, <strong>10 € par jour</strong> maximum. De là, on monte à Castello avec les <strong>ascenseurs publics gratuits</strong> du Viale Regina Elena : celui de <strong>Saint-Remy</strong>, dans les jardins sous les remparts à environ 100 m de la Piazza Costituzione, qui mène au Bastion de Saint-Remy, et ceux de l'<strong>ancienne Unione Sarda</strong>, qui montent vers le quartier."),
+            ("🅿️", "Vous venez en voiture ? Où se garer", "Castello est en ZTL : laissez la voiture hors du quartier. Le parking gratuit le plus proche se trouve sur le <strong>Viale Buoncammino</strong> ; côté payant, il y a les zones et le parking à étages du <strong>Viale Regina Elena</strong>, reliés à Castello par des ascenseurs publics. <a class=\"text-link\" href=\"{parking}\">Lire notre guide complet du stationnement, avec cartes et tarifs →</a>"),
             ("🚐", "Transfert sur demande", "Vous préférez être accompagnés ? Nous organisons le transfert depuis et vers la maison : demandez-le-nous à l'avance."),
         ],
-        "arr_note": "Tarifs et horaires (y compris ceux des ascenseurs, qui en été peuvent s'arrêter aux heures les plus chaudes) sont indicatifs : vérifiez-les avant votre voyage.",
+        "arr_note": "Horaires et tarifs sont indicatifs : vérifiez-les avant votre voyage.",
         "faq_eyebrow": "Questions fréquentes",
         "faq_h2": "Bon à savoir",
         "faq": [
             ("Comment venir depuis l'aéroport ?", "En train d'Elmas Aeroporto à la gare de Cagliari, Piazza Matteotti (10 minutes environ), puis bus CTM ligne 7, qui s'arrête juste devant chez nous."),
-            ("Castello est-il en ZTL ? Où se garer ?", "Oui, Castello est une zone à trafic limité. Le parking gratuit le plus proche se trouve sur le Viale Buoncammino (lignes blanches ; les bleues sont payantes). Sinon, il y a le parking couvert du Viale Regina Elena (environ 1,70 € de l'heure, 10 € par jour maximum), relié à Castello par des ascenseurs publics gratuits."),
+            ("Castello est-il en ZTL ? Où se garer ?", "Oui, Castello est une zone à trafic limité : n'entrez pas en voiture dans le quartier. Le parking gratuit le plus proche se trouve sur le Viale Buoncammino ; côté payant, il y a les zones et le parking à étages du Viale Regina Elena, reliés à Castello par des ascenseurs publics. Tous les détails, avec cartes et tarifs, sont dans notre guide du stationnement : https://www.meribnb.it/fr/stationnement/"),
             ("Un transfert est-il possible ?", "Oui, sur demande : écrivez-nous à l'avance pour l'organiser."),
             ("L'eau du robinet est-elle potable ?", "Oui, l'eau du robinet est potable : fraîche et bonne à boire."),
             ("Quels sont les horaires d'arrivée et de départ ?", "L'arrivée se fait de 15 h à 20 h ; pour un autre horaire, prévenez-nous. Le départ se fait avant 10 h 30. Vous pouvez faire le check-in en ligne à l'avance grâce au bouton en haut de la page."),
@@ -390,7 +390,7 @@ T = {
         "og_description": "Habitaciones con baño privado en el barrio de Castello, centro histórico de Cagliari. A pocos pasos del Bastión de Saint Remy.",
         "ids": {"rooms": "habitaciones", "amenities": "servicios", "location": "ubicacion",
                 "arrival": "como-llegar", "faq": "faq", "contact": "contacto"},
-        "nav": {"rooms": "Habitaciones", "amenities": "Servicios", "location": "Ubicación",
+        "nav": {"rooms": "Habitaciones", "amenities": "Servicios", "location": "Ubicación", "parking": "Aparcar",
                 "arrival": "Cómo llegar", "faq": "FAQ", "book": "Reservar"},
         "nav_label": "Navegación principal",
         "menu_open": "Abrir menú",
@@ -452,21 +452,20 @@ T = {
                       ("Aeropuerto de Cagliari-Elmas", "15 min en coche")],
         "maps_button": "Abrir en Google Maps",
         "arr_eyebrow": "Cómo llegar",
-        "arr_h2": "Aeropuerto, coche y aparcamientos",
+        "arr_h2": "Aeropuerto, tren y coche",
         "arr_intro": "Castello es una <strong>zona de tráfico limitado (ZTL)</strong>: en coche no se llega hasta la puerta. Estas son las formas más cómodas de llegar.",
         "arrival": [
             ("✈️", "Desde el aeropuerto en tren", "Desde la estación Elmas Aeroporto, a pocos pasos de la terminal, el tren te lleva en unos 10 minutos a la estación de Cagliari en <strong>Piazza Matteotti</strong> (billete de aprox. 1,30 €, un tren cada 20 minutos aprox.)."),
             ("🚌", "Después, el autobús 7", "Delante de la estación, toma el autobús CTM <strong>línea 7</strong>: sube a Castello y para justo delante de casa."),
-            ("🅿️", "En coche: aparcamiento gratuito", "El más cercano está en el <strong>Viale Buoncammino</strong>, en el lado panorámico con vistas a la ciudad: las plazas de rayas blancas son gratuitas y las de <strong>rayas azules, de pago</strong>."),
-            ("🏢", "En coche: aparcamiento Regina Elena", "Aparcamiento cubierto en <strong>Viale Regina Elena 17</strong>, abierto 24 horas: aprox. 1,70 € la hora, <strong>10 € al día</strong> como máximo. Desde allí se sube a Castello con los <strong>ascensores públicos gratuitos</strong> del Viale Regina Elena: el de <strong>Saint Remy</strong>, en los jardines bajo las murallas a unos 100 m de Piazza Costituzione, que lleva al Bastión de Saint Remy, y los de la <strong>antigua Unione Sarda</strong>, que suben hacia el barrio."),
+            ("🅿️", "¿Vienes en coche? Dónde aparcar", "Castello es ZTL: deja el coche fuera del barrio. El aparcamiento gratuito más cercano está en el <strong>Viale Buoncammino</strong>; de pago están las zonas y el aparcamiento de varias plantas del <strong>Viale Regina Elena</strong>, conectados con Castello por ascensores públicos. <a class=\"text-link\" href=\"{parking}\">Lee nuestra guía completa de aparcamiento, con mapas y tarifas →</a>"),
             ("🚐", "Traslado bajo petición", "¿Prefieres que te acompañemos? Organizamos el traslado desde y hacia el alojamiento: pídenoslo con antelación."),
         ],
-        "arr_note": "Precios y horarios (también los de los ascensores, que en verano pueden pararse en las horas de más calor) son orientativos: compruébalos antes del viaje.",
+        "arr_note": "Horarios y precios son orientativos: compruébalos antes del viaje.",
         "faq_eyebrow": "Preguntas frecuentes",
         "faq_h2": "Bueno saberlo",
         "faq": [
             ("¿Cómo llego desde el aeropuerto?", "En tren desde Elmas Aeroporto hasta la estación de Cagliari en Piazza Matteotti (unos 10 minutos) y después el autobús CTM línea 7, que para justo delante de casa."),
-            ("¿Castello es ZTL? ¿Dónde aparco?", "Sí, Castello es zona de tráfico limitado. El aparcamiento gratuito más cercano está en el Viale Buoncammino (rayas blancas; las azules son de pago). Como alternativa está el aparcamiento cubierto del Viale Regina Elena (aprox. 1,70 € la hora, 10 € al día como máximo), conectado con Castello por ascensores públicos gratuitos."),
+            ("¿Castello es ZTL? ¿Dónde aparco?", "Sí, Castello es zona de tráfico limitado: no entres en coche en el barrio. El aparcamiento gratuito más cercano está en el Viale Buoncammino; de pago están las zonas y el aparcamiento de varias plantas del Viale Regina Elena, conectados con Castello por ascensores públicos. Todos los detalles, con mapas y tarifas, están en nuestra guía de aparcamiento: https://www.meribnb.it/es/aparcamiento/"),
             ("¿Hay servicio de traslado?", "Sí, bajo petición: escríbenos con antelación para organizarlo."),
             ("¿El agua del grifo es potable?", "Sí, el agua del grifo es potable: fresca y buena para beber."),
             ("¿A qué hora son el check-in y el check-out?", "El check-in es de 15:00 a 20:00; si necesitas otro horario, avísanos. El check-out es antes de las 10:30. Puedes hacer el check-in online con antelación desde el botón de arriba de la página."),
@@ -495,21 +494,338 @@ T = {
 }
 
 
+# ------------------------------------------------- pagina parcheggi --
+#
+# Dati verificati a ottobre 2026 su fonti pubbliche (vedi SOURCES): tariffe,
+# orari e ascensori possono cambiare, per questo la pagina invita sempre a
+# controllare i cartelli sul posto.
+
+# Dove si trova la pagina parcheggi in ogni lingua (cartella del sito)
+HOME_DIR = {"it": "", "en": "en", "fr": "fr", "es": "es"}
+PARK_DIR = {"it": "parcheggi", "en": "en/parking", "fr": "fr/stationnement", "es": "es/aparcamiento"}
+
+# Destinazione del percorso a piedi su Google Maps
+DEST = "Via Alberto Lamarmora 18, 09124 Cagliari"
+
+# Ogni parcheggio/ascensore: scheda in cui compare, ricerca per la mappa,
+# punto di partenza del percorso a piedi fino al B&B, via (per i dati strutturati).
+SPOTS = {
+    "buoncammino": {"tab": "free", "map": "Porta Cristina, Cagliari", "from": "Porta Cristina, Cagliari", "street": "Viale Buon Cammino"},
+    "blue_free":   {"tab": "free", "map": None, "from": None, "street": None},
+    "re_alta":     {"tab": "paid", "map": "Viale Regina Elena, 09121 Cagliari", "from": "Viale Regina Elena, 09121 Cagliari", "street": "Viale Regina Elena"},
+    "re_bassa":    {"tab": "paid", "map": "Viale Regina Elena, 09124 Cagliari", "from": "Viale Regina Elena, 09124 Cagliari", "street": "Viale Regina Elena"},
+    "multipiano":  {"tab": "paid", "map": "APCOA Parking Regina Elena, Viale Regina Elena 17, Cagliari", "from": "APCOA Parking Regina Elena, Viale Regina Elena 17, Cagliari", "street": "Viale Regina Elena 17"},
+    "blue_paid":   {"tab": "paid", "map": None, "from": None, "street": None},
+    "lift_palazzo": {"tab": "lifts", "map": "Terrapieno, Viale Regina Elena 14, Cagliari", "from": "Piazza Palazzo, Cagliari", "street": None},
+    "lift_remy":   {"tab": "lifts", "map": "Bastione di Saint Remy, Cagliari", "from": "Bastione di Saint Remy, Cagliari", "street": None},
+}
+TABS = ["free", "paid", "lifts", "tips"]
+FACILITIES = ["buoncammino", "re_alta", "re_bassa", "multipiano"]   # nei dati strutturati
+
+SOURCES = [
+    ("APCOA – Parcheggio Regina Elena", "https://www.apcoa.it/sosta-breve/sedi/cagliari/regina-elena"),
+    ("APCOA – Area Regina Elena Alta", "https://www.apcoa.it/sosta-breve/sedi/cagliari/area-regina-elena-alta"),
+    ("APCOA – Area Regina Elena Bassa 2", "https://www.apcoa.it/parcheggi-in/cagliari/area-regina-elena-bassa-2/"),
+    ("Telepass – Strisce blu a Cagliari", "https://www.telepass.com/en/consumer/services/street-parking/cagliari"),
+    ("Comune di Cagliari – Ascensori di Castello", "https://www.comune.cagliari.it/portale/page/it/riaperti_al_pubblico_gli_ascensori_di_castello?contentId=NVT176097"),
+    ("Museo Archeologico Nazionale – Come raggiungerci", "https://museinazionalicagliari.cultura.gov.it/visita/come-raggiungerci/come-raggiungerci/"),
+]
+
+P = {
+    # ===================================================== ITALIANO =====
+    "it": {
+        "title": "Dove parcheggiare a Cagliari vicino a Castello — B&B Merì",
+        "description": "Guida ai parcheggi vicino al quartiere Castello di Cagliari: parcheggio gratuito in Viale Buoncammino, aree a pagamento e multipiano in Viale Regina Elena, ascensori pubblici, ZTL, tariffe e mappe.",
+        "keywords": "parcheggio castello cagliari, dove parcheggiare cagliari, parcheggio gratuito cagliari centro, viale buoncammino parcheggio, parcheggio regina elena cagliari, ztl castello cagliari",
+        "og_description": "Parcheggi gratuiti e a pagamento vicino a Castello, ascensori, ZTL e mappe: la guida del B&B Merì.",
+        "back": "Torna alla home",
+        "eyebrow": "Guida ai parcheggi · Castello, Cagliari",
+        "h1": "Dove parcheggiare<br>vicino a Castello",
+        "intro": "Castello è una <strong>zona a traffico limitato (ZTL)</strong>: le auto dei visitatori non possono entrare nel quartiere. La buona notizia è che appena fuori dalle mura ci sono parcheggi gratuiti e a pagamento, collegati al B&amp;B da brevi passeggiate e ascensori pubblici. Qui trovi tutto, con mappe e tariffe.",
+        "satnav_title": "Prima di partire: nel navigatore imposta il parcheggio, non l'indirizzo del B&amp;B",
+        "satnav_text": "Se imposti Via Alberto Lamarmora 18 il navigatore può portarti dentro la ZTL, sorvegliata da telecamere che fanno multe. Scegli uno dei parcheggi qui sotto e usa il pulsante «Percorso a piedi» per l'ultimo tratto.",
+        "quick_title": "In breve: quale scegliere",
+        "quick": [
+            ("💸", "Vuoi spendere zero", "Viale Buoncammino: strisce bianche gratuite, circa 10 minuti a piedi quasi in piano.", "buoncammino"),
+            ("🪙", "Vuoi spendere poco", "Area Regina Elena Alta: massimo €2,50 al giorno, poi ascensori fino a Castello.", "re_alta"),
+            ("🛡️", "Vuoi un posto coperto, aperto 24 ore", "Multipiano Regina Elena: circa €1,70 l'ora, massimo €10 al giorno.", "multipiano"),
+        ],
+        "map_title": "Mappa",
+        "tabs_label": "Tipi di parcheggio",
+        "tabs": {"free": "Parcheggi gratuiti", "paid": "Parcheggi a pagamento",
+                 "lifts": "Ascensori per Castello", "tips": "Consigli utili"},
+        "tab_intro": {
+            "free": "Gratis, ma da cercare: in alta stagione conviene arrivare presto o la sera.",
+            "paid": "Le soluzioni più comode lungo Viale Regina Elena, sotto le mura di Castello. Tariffe indicative.",
+            "lifts": "Dai parcheggi di Viale Regina Elena si sale in Castello senza fatica con gli ascensori pubblici.",
+            "tips": "Piccoli consigli per arrivare senza stress.",
+        },
+        "spots": {
+            "buoncammino": ("Viale Buoncammino", "Gratuito",
+                [("Costo", "gratis sulle strisce bianche"), ("A piedi fino al B&B", "circa 10 minuti, quasi tutto in piano"), ("Entrata in Castello", "Porta Cristina → Piazza Arsenale")],
+                "Il viale panoramico sul crinale, con vista su tutta la città: è il parcheggio gratuito più vicino. Cerca posto il più vicino possibile a <strong>Porta Cristina</strong>, poi entra a piedi in Castello da Piazza Arsenale. Attenzione: su una parte del viale le strisce sono <strong>blu, cioè a pagamento</strong>. In alta stagione può essere pieno."),
+            "blue_free": ("Strisce blu, gratis in certi orari", "Gratis la sera e la domenica",
+                [("Gratis", "domenica e festivi; dal lunedì al sabato 13–16 e 20–9"), ("A pagamento", "lunedì–sabato 9–13 e 16–20")],
+                "Le strisce blu si pagano solo in certe fasce orarie. Se arrivi la sera o nel fine settimana puoi lasciare l'auto anche sulle strisce blu vicine a Castello (Viale Buoncammino, Viale Regina Elena) senza pagare: ricordati però di pagare quando inizia la fascia a pagamento. Controlla sempre il cartello dell'area."),
+            "re_alta": ("Area Regina Elena Alta (APCOA)", "Il più economico",
+                [("Costo", "€0,50 la prima ora, poi €1 l'ora — massimo €2,50 al giorno"), ("Si paga", "lunedì–sabato 9–13 e 16–20"), ("A piedi fino al B&B", "circa 10 minuti con gli ascensori")],
+                "Stalli blu all'aperto nella parte alta di Viale Regina Elena, sotto le mura di Castello. Con il tetto di €2,50 al giorno è l'opzione a pagamento più conveniente se resti più giorni. Da qui sali in Castello con gli ascensori pubblici."),
+            "re_bassa": ("Aree Regina Elena Bassa 1 e 2 (APCOA)", "A pagamento",
+                [("Costo", "Bassa 1: €1 l'ora, massimo €8 al giorno · Bassa 2: €0,50 la prima ora, poi €1, massimo €7,50"), ("Si paga", "lunedì–sabato 9–13 e 16–20"), ("A piedi fino al B&B", "circa 10–15 minuti con gli ascensori")],
+                "Altri stalli blu nella parte bassa di Viale Regina Elena: utili quando la Regina Elena Alta è piena."),
+            "multipiano": ("Parcheggio multipiano Regina Elena (APCOA)", "Coperto · 24 ore",
+                [("Costo", "circa €1,70 l'ora, massimo €10 al giorno"), ("Orari", "aperto 24 ore su 24"), ("Indirizzo", "Viale Regina Elena 17"), ("A piedi fino al B&B", "circa 10 minuti con gli ascensori")],
+                "Parcheggio coperto ai piedi delle mura: la scelta più comoda e tranquilla se lasci l'auto per tutto il soggiorno. Usciti dal parcheggio, gli ascensori pubblici di Viale Regina Elena portano in Castello."),
+            "blue_paid": ("Strisce blu in centro", "A pagamento",
+                [("Costo", "circa €1 l'ora (in alcune zone €0,50 la prima ora), massimo €10 al giorno"), ("Si paga", "lunedì–sabato 9–13 e 16–20; domenica e festivi gratis"), ("Come pagare", "al parcometro o con un'app (per esempio Telepass o MoneyGo)")],
+                "Ci sono anche su parte di Viale Buoncammino e nelle vie intorno a Castello. Le tariffe cambiano da zona a zona: leggi sempre il cartello."),
+            "lift_palazzo": ("Ascensori ex Unione Sarda → Piazza Palazzo", "Il più vicino al B&B",
+                [("Partenza", "Viale Regina Elena, all'altezza del Terrapieno"), ("Arrivo", "Piazza Palazzo, accanto alla Cattedrale: a pochi passi dal B&B"), ("Costo", "gratuito")],
+                "Due ascensori in sequenza: il primo sale da Viale Regina Elena al Terrapieno, il secondo, panoramico, arriva in Piazza Palazzo. È il collegamento più diretto con il B&amp;B. D'estate possono fermarsi nelle ore più calde."),
+            "lift_remy": ("Ascensore di Saint Remy → Bastione", "Gratuito",
+                [("Partenza", "Viale Regina Elena, nei giardini sotto le mura, a circa 100 m da Piazza Costituzione"), ("Arrivo", "Bastione di Saint Remy, poi pochi minuti a piedi"), ("Costo", "gratuito")],
+                "Porta sulla grande terrazza del Bastione di Saint Remy, a pochi minuti a piedi dal B&amp;B. Anche questo d'estate può fermarsi nelle ore più calde."),
+        },
+        "buttons": {"show": "Mostra sulla mappa", "open": "Apri in Google Maps", "walk": "Percorso a piedi fino al B&B"},
+        "tips": [
+            ("🧭", "Navigatore", "Imposta come destinazione il parcheggio scelto, non l'indirizzo del B&amp;B: eviti di entrare per errore nella ZTL."),
+            ("🚫", "ZTL e telecamere", "Non entrare in auto in Castello: gli accessi sono controllati da telecamere. Anche i posti di Piazza Indipendenza sono riservati ai residenti."),
+            ("🌙", "Arrivo la sera o nel weekend", "Le strisce blu sono gratis la domenica, nei festivi e dal lunedì al sabato dalle 20 alle 9 e dalle 13 alle 16."),
+            ("🌡️", "Ascensori fermi?", "D'estate gli ascensori possono fermarsi nelle ore più calde. Si può salire a piedi lungo Via Ubaldo Badas, oppure parcheggiare in Viale Buoncammino, che è già alla quota di Castello."),
+            ("🧳", "Valigie pesanti", "Possiamo organizzare un transfer su richiesta: scrivici prima dell'arrivo."),
+            ("💬", "Dubbi?", f"Scrivici su WhatsApp al {PHONE}: ti diciamo dove conviene parcheggiare in quel momento."),
+        ],
+        "updated": "Informazioni verificate a ottobre 2026 su fonti pubbliche (APCOA, Telepass, Comune di Cagliari). Tariffe, orari e funzionamento degli ascensori possono cambiare: controlla sempre i cartelli sul posto.",
+        "sources_label": "Fonti",
+        "help_title": "Serve una mano?",
+        "help_text": "Scrivici prima di partire: ti consigliamo il parcheggio migliore per il tuo orario di arrivo. Su richiesta organizziamo anche il transfer.",
+    },
+
+    # ====================================================== ENGLISH =====
+    "en": {
+        "title": "Where to park in Cagliari near Castello — B&B Merì",
+        "description": "Parking guide for Cagliari's Castello district: free parking on Viale Buoncammino, paid street areas and the multi-storey car park on Viale Regina Elena, public lifts, ZTL rules, prices and maps.",
+        "keywords": "parking castello cagliari, where to park cagliari, free parking cagliari centre, viale buoncammino parking, regina elena car park cagliari, ztl castello cagliari",
+        "og_description": "Free and paid parking near Castello, lifts, ZTL and maps: the B&B Merì parking guide.",
+        "back": "Back to the home page",
+        "eyebrow": "Parking guide · Castello, Cagliari",
+        "h1": "Where to park<br>near Castello",
+        "intro": "Castello is a <strong>limited-traffic zone (ZTL)</strong>: visitors' cars can't enter the quarter. The good news is that just outside the walls there are free and paid car parks, linked to the B&amp;B by short walks and public lifts. Here's everything you need, with maps and prices.",
+        "satnav_title": "Before you set off: put the car park in your sat-nav, not the B&amp;B address",
+        "satnav_text": "If you enter Via Alberto Lamarmora 18, your sat-nav may take you into the ZTL, where cameras issue fines. Pick one of the car parks below and use the «Walking route» button for the last stretch.",
+        "quick_title": "In short: which one to choose",
+        "quick": [
+            ("💸", "Spend nothing", "Viale Buoncammino: free white-line spaces, about a 10-minute, mostly flat walk.", "buoncammino"),
+            ("🪙", "Spend little", "Regina Elena Alta area: €2.50 per day maximum, then lifts up to Castello.", "re_alta"),
+            ("🛡️", "Covered and open 24/7", "Regina Elena multi-storey car park: about €1.70 per hour, €10 per day maximum.", "multipiano"),
+        ],
+        "map_title": "Map",
+        "tabs_label": "Parking types",
+        "tabs": {"free": "Free parking", "paid": "Paid parking",
+                 "lifts": "Lifts to Castello", "tips": "Useful tips"},
+        "tab_intro": {
+            "free": "Free, but you need to find a space: in high season it's best to arrive early or in the evening.",
+            "paid": "The most convenient options along Viale Regina Elena, below the walls of Castello. Prices are indicative.",
+            "lifts": "From the car parks on Viale Regina Elena you can go up to Castello effortlessly with the public lifts.",
+            "tips": "A few tips for a stress-free arrival.",
+        },
+        "spots": {
+            "buoncammino": ("Viale Buoncammino", "Free",
+                [("Cost", "free on white lines"), ("Walk to the B&B", "about 10 minutes, mostly flat"), ("Way into Castello", "Porta Cristina → Piazza Arsenale")],
+                "The panoramic avenue along the ridge, with views over the whole city: it's the nearest free parking. Look for a space as close as possible to <strong>Porta Cristina</strong>, then walk into Castello through Piazza Arsenale. Watch out: on part of the avenue the lines are <strong>blue, which means paid</strong>. In high season it can be full."),
+            "blue_free": ("Blue lines, free at certain times", "Free evenings and Sundays",
+                [("Free", "Sundays and public holidays; Monday–Saturday 1–4 PM and 8 PM–9 AM"), ("Paid", "Monday–Saturday 9 AM–1 PM and 4–8 PM")],
+                "Blue-line spaces are only paid at certain times. If you arrive in the evening or at the weekend you can also leave the car on the blue lines near Castello (Viale Buoncammino, Viale Regina Elena) for free — just remember to pay when the paid hours start. Always check the sign for that area."),
+            "re_alta": ("Regina Elena Alta area (APCOA)", "Cheapest",
+                [("Cost", "€0.50 the first hour, then €1 per hour — €2.50 per day maximum"), ("Paid hours", "Monday–Saturday 9 AM–1 PM and 4–8 PM"), ("Walk to the B&B", "about 10 minutes using the lifts")],
+                "Open-air blue-line spaces on the upper part of Viale Regina Elena, below the walls of Castello. With its €2.50 daily cap, it's the best-value paid option if you stay several days. From here, go up to Castello with the public lifts."),
+            "re_bassa": ("Regina Elena Bassa 1 and 2 areas (APCOA)", "Paid",
+                [("Cost", "Bassa 1: €1 per hour, €8 per day maximum · Bassa 2: €0.50 the first hour, then €1, €7.50 maximum"), ("Paid hours", "Monday–Saturday 9 AM–1 PM and 4–8 PM"), ("Walk to the B&B", "about 10–15 minutes using the lifts")],
+                "More blue-line spaces on the lower part of Viale Regina Elena: handy when Regina Elena Alta is full."),
+            "multipiano": ("Regina Elena multi-storey car park (APCOA)", "Covered · 24/7",
+                [("Cost", "about €1.70 per hour, €10 per day maximum"), ("Hours", "open 24/7"), ("Address", "Viale Regina Elena 17"), ("Walk to the B&B", "about 10 minutes using the lifts")],
+                "A covered car park at the foot of the walls: the easiest, most worry-free choice if you leave the car for your whole stay. Once outside, the public lifts on Viale Regina Elena take you up to Castello."),
+            "blue_paid": ("Blue lines in the centre", "Paid",
+                [("Cost", "about €1 per hour (in some areas €0.50 the first hour), €10 per day maximum"), ("Paid hours", "Monday–Saturday 9 AM–1 PM and 4–8 PM; free on Sundays and public holidays"), ("How to pay", "at the parking meter or with an app (for example Telepass or MoneyGo)")],
+                "You'll also find them on part of Viale Buoncammino and in the streets around Castello. Prices vary from area to area: always read the sign."),
+            "lift_palazzo": ("Former Unione Sarda lifts → Piazza Palazzo", "Closest to the B&B",
+                [("From", "Viale Regina Elena, by the Terrapieno"), ("To", "Piazza Palazzo, next to the Cathedral: a few steps from the B&B"), ("Cost", "free")],
+                "Two lifts in a row: the first goes up from Viale Regina Elena to the Terrapieno, the second, a panoramic one, arrives in Piazza Palazzo. It's the most direct link to the B&amp;B. In summer they may stop during the hottest hours."),
+            "lift_remy": ("Saint Remy lift → Bastion", "Free",
+                [("From", "Viale Regina Elena, in the gardens below the walls, about 100 m from Piazza Costituzione"), ("To", "Bastione di Saint Remy, then a few minutes on foot"), ("Cost", "free")],
+                "It takes you up to the great terrace of the Bastione di Saint Remy, a few minutes' walk from the B&amp;B. In summer it may also stop during the hottest hours."),
+        },
+        "buttons": {"show": "Show on the map", "open": "Open in Google Maps", "walk": "Walking route to the B&B"},
+        "tips": [
+            ("🧭", "Sat-nav", "Set the car park you've chosen as your destination, not the B&amp;B address: that way you won't drive into the ZTL by mistake."),
+            ("🚫", "ZTL and cameras", "Don't drive into Castello: the entrances are monitored by cameras. The spaces in Piazza Indipendenza are reserved for residents too."),
+            ("🌙", "Arriving in the evening or at the weekend", "Blue lines are free on Sundays, public holidays and Monday to Saturday from 8 PM to 9 AM and from 1 to 4 PM."),
+            ("🌡️", "Lifts not running?", "In summer the lifts may stop during the hottest hours. You can walk up along Via Ubaldo Badas, or park on Viale Buoncammino, which is already at Castello's level."),
+            ("🧳", "Heavy luggage", "We can arrange a transfer on request: write to us before you arrive."),
+            ("💬", "Any questions?", f"Message us on WhatsApp at {PHONE_INTL}: we'll tell you the best place to park at that moment."),
+        ],
+        "updated": "Information checked in October 2026 against public sources (APCOA, Telepass, Comune di Cagliari). Prices, times and lift operation may change: always check the signs on site.",
+        "sources_label": "Sources",
+        "help_title": "Need a hand?",
+        "help_text": "Write to us before you set off: we'll suggest the best car park for your arrival time. We can also arrange a transfer on request.",
+    },
+
+    # ===================================================== FRANÇAIS =====
+    "fr": {
+        "title": "Où se garer à Cagliari près de Castello — B&B Merì",
+        "description": "Guide du stationnement dans le quartier de Castello à Cagliari : parking gratuit sur le Viale Buoncammino, zones payantes et parking à étages du Viale Regina Elena, ascenseurs publics, ZTL, tarifs et cartes.",
+        "keywords": "parking castello cagliari, où se garer cagliari, parking gratuit cagliari centre, viale buoncammino parking, parking regina elena cagliari, ztl castello cagliari",
+        "og_description": "Parkings gratuits et payants près de Castello, ascenseurs, ZTL et cartes : le guide du B&B Merì.",
+        "back": "Retour à l'accueil",
+        "eyebrow": "Guide du stationnement · Castello, Cagliari",
+        "h1": "Où se garer<br>près de Castello",
+        "intro": "Castello est une <strong>zone à trafic limité (ZTL)</strong> : les voitures des visiteurs ne peuvent pas entrer dans le quartier. Bonne nouvelle : juste au pied des remparts, il y a des parkings gratuits et payants, reliés à la maison par de courtes promenades et des ascenseurs publics. Voici tout ce qu'il faut savoir, avec cartes et tarifs.",
+        "satnav_title": "Avant de partir : dans le GPS, indiquez le parking, pas l'adresse du B&amp;B",
+        "satnav_text": "Si vous saisissez Via Alberto Lamarmora 18, le GPS peut vous faire entrer dans la ZTL, surveillée par des caméras qui verbalisent. Choisissez l'un des parkings ci-dessous et utilisez le bouton « Itinéraire à pied » pour le dernier tronçon.",
+        "quick_title": "En bref : lequel choisir",
+        "quick": [
+            ("💸", "Ne rien dépenser", "Viale Buoncammino : places gratuites (lignes blanches), environ 10 minutes à pied, presque à plat.", "buoncammino"),
+            ("🪙", "Dépenser peu", "Zone Regina Elena Alta : 2,50 € par jour maximum, puis ascenseurs jusqu'à Castello.", "re_alta"),
+            ("🛡️", "Couvert et ouvert 24 h/24", "Parking à étages Regina Elena : environ 1,70 € de l'heure, 10 € par jour maximum.", "multipiano"),
+        ],
+        "map_title": "Carte",
+        "tabs_label": "Types de stationnement",
+        "tabs": {"free": "Parkings gratuits", "paid": "Parkings payants",
+                 "lifts": "Ascenseurs vers Castello", "tips": "Conseils utiles"},
+        "tab_intro": {
+            "free": "Gratuits, mais il faut trouver une place : en haute saison, mieux vaut arriver tôt ou le soir.",
+            "paid": "Les solutions les plus pratiques le long du Viale Regina Elena, sous les remparts de Castello. Tarifs indicatifs.",
+            "lifts": "Depuis les parkings du Viale Regina Elena, on monte à Castello sans effort grâce aux ascenseurs publics.",
+            "tips": "Quelques conseils pour arriver sans stress.",
+        },
+        "spots": {
+            "buoncammino": ("Viale Buoncammino", "Gratuit",
+                [("Coût", "gratuit sur les lignes blanches"), ("À pied jusqu'au B&B", "environ 10 minutes, presque à plat"), ("Entrée dans Castello", "Porta Cristina → Piazza Arsenale")],
+                "L'avenue panoramique sur la crête, avec vue sur toute la ville : c'est le parking gratuit le plus proche. Cherchez une place au plus près de la <strong>Porta Cristina</strong>, puis entrez à pied dans Castello par la Piazza Arsenale. Attention : sur une partie de l'avenue, les lignes sont <strong>bleues, donc payantes</strong>. En haute saison, il peut être complet."),
+            "blue_free": ("Lignes bleues, gratuites à certaines heures", "Gratuit le soir et le dimanche",
+                [("Gratuit", "dimanche et jours fériés ; du lundi au samedi 13 h–16 h et 20 h–9 h"), ("Payant", "lundi–samedi 9 h–13 h et 16 h–20 h")],
+                "Les places à lignes bleues ne sont payantes qu'à certaines heures. Si vous arrivez le soir ou le week-end, vous pouvez aussi laisser la voiture gratuitement sur les lignes bleues près de Castello (Viale Buoncammino, Viale Regina Elena) : pensez simplement à payer quand la plage payante commence. Vérifiez toujours le panneau de la zone."),
+            "re_alta": ("Zone Regina Elena Alta (APCOA)", "Le moins cher",
+                [("Coût", "0,50 € la première heure, puis 1 € de l'heure — 2,50 € par jour maximum"), ("Heures payantes", "lundi–samedi 9 h–13 h et 16 h–20 h"), ("À pied jusqu'au B&B", "environ 10 minutes avec les ascenseurs")],
+                "Places à lignes bleues en plein air dans la partie haute du Viale Regina Elena, sous les remparts de Castello. Avec son plafond de 2,50 € par jour, c'est l'option payante la plus avantageuse pour plusieurs jours. De là, montez à Castello avec les ascenseurs publics."),
+            "re_bassa": ("Zones Regina Elena Bassa 1 et 2 (APCOA)", "Payant",
+                [("Coût", "Bassa 1 : 1 € de l'heure, 8 € par jour maximum · Bassa 2 : 0,50 € la première heure, puis 1 €, 7,50 € maximum"), ("Heures payantes", "lundi–samedi 9 h–13 h et 16 h–20 h"), ("À pied jusqu'au B&B", "environ 10–15 minutes avec les ascenseurs")],
+                "D'autres places à lignes bleues dans la partie basse du Viale Regina Elena : pratiques quand la Regina Elena Alta est pleine."),
+            "multipiano": ("Parking à étages Regina Elena (APCOA)", "Couvert · 24 h/24",
+                [("Coût", "environ 1,70 € de l'heure, 10 € par jour maximum"), ("Horaires", "ouvert 24 h/24"), ("Adresse", "Viale Regina Elena 17"), ("À pied jusqu'au B&B", "environ 10 minutes avec les ascenseurs")],
+                "Un parking couvert au pied des remparts : le choix le plus pratique et le plus serein si vous laissez la voiture pendant tout le séjour. À la sortie, les ascenseurs publics du Viale Regina Elena vous montent à Castello."),
+            "blue_paid": ("Lignes bleues en centre-ville", "Payant",
+                [("Coût", "environ 1 € de l'heure (dans certaines zones 0,50 € la première heure), 10 € par jour maximum"), ("Heures payantes", "lundi–samedi 9 h–13 h et 16 h–20 h ; gratuit le dimanche et les jours fériés"), ("Paiement", "à l'horodateur ou avec une application (par exemple Telepass ou MoneyGo)")],
+                "Vous en trouverez aussi sur une partie du Viale Buoncammino et dans les rues autour de Castello. Les tarifs varient selon la zone : lisez toujours le panneau."),
+            "lift_palazzo": ("Ascenseurs de l'ancienne Unione Sarda → Piazza Palazzo", "Le plus proche du B&B",
+                [("Départ", "Viale Regina Elena, à hauteur du Terrapieno"), ("Arrivée", "Piazza Palazzo, à côté de la cathédrale : à deux pas du B&B"), ("Coût", "gratuit")],
+                "Deux ascenseurs à la suite : le premier monte du Viale Regina Elena au Terrapieno, le second, panoramique, arrive Piazza Palazzo. C'est la liaison la plus directe avec le B&amp;B. En été, ils peuvent s'arrêter aux heures les plus chaudes."),
+            "lift_remy": ("Ascenseur de Saint-Remy → Bastion", "Gratuit",
+                [("Départ", "Viale Regina Elena, dans les jardins sous les remparts, à environ 100 m de la Piazza Costituzione"), ("Arrivée", "Bastion de Saint-Remy, puis quelques minutes à pied"), ("Coût", "gratuit")],
+                "Il mène à la grande terrasse du Bastion de Saint-Remy, à quelques minutes à pied du B&amp;B. En été, il peut lui aussi s'arrêter aux heures les plus chaudes."),
+        },
+        "buttons": {"show": "Voir sur la carte", "open": "Ouvrir dans Google Maps", "walk": "Itinéraire à pied jusqu'au B&B"},
+        "tips": [
+            ("🧭", "GPS", "Indiquez comme destination le parking choisi, pas l'adresse du B&amp;B : vous éviterez d'entrer par erreur dans la ZTL."),
+            ("🚫", "ZTL et caméras", "N'entrez pas en voiture dans Castello : les accès sont surveillés par des caméras. Les places de la Piazza Indipendenza sont aussi réservées aux résidents."),
+            ("🌙", "Arrivée le soir ou le week-end", "Les lignes bleues sont gratuites le dimanche, les jours fériés et du lundi au samedi de 20 h à 9 h et de 13 h à 16 h."),
+            ("🌡️", "Ascenseurs à l'arrêt ?", "En été, les ascenseurs peuvent s'arrêter aux heures les plus chaudes. Vous pouvez monter à pied par la Via Ubaldo Badas, ou vous garer sur le Viale Buoncammino, déjà au niveau de Castello."),
+            ("🧳", "Bagages lourds", "Nous pouvons organiser un transfert sur demande : écrivez-nous avant votre arrivée."),
+            ("💬", "Une question ?", f"Écrivez-nous sur WhatsApp au {PHONE_INTL} : nous vous dirons où il vaut mieux se garer à ce moment-là."),
+        ],
+        "updated": "Informations vérifiées en octobre 2026 auprès de sources publiques (APCOA, Telepass, Comune di Cagliari). Tarifs, horaires et fonctionnement des ascenseurs peuvent changer : vérifiez toujours les panneaux sur place.",
+        "sources_label": "Sources",
+        "help_title": "Besoin d'un coup de main ?",
+        "help_text": "Écrivez-nous avant de partir : nous vous conseillerons le meilleur parking selon votre heure d'arrivée. Nous pouvons aussi organiser un transfert sur demande.",
+    },
+
+    # ====================================================== ESPAÑOL =====
+    "es": {
+        "title": "Dónde aparcar en Cagliari cerca de Castello — B&B Merì",
+        "description": "Guía de aparcamiento para el barrio de Castello en Cagliari: aparcamiento gratuito en el Viale Buoncammino, zonas de pago y aparcamiento de varias plantas en el Viale Regina Elena, ascensores públicos, ZTL, tarifas y mapas.",
+        "keywords": "aparcamiento castello cagliari, dónde aparcar en cagliari, aparcamiento gratis cagliari centro, viale buoncammino aparcamiento, parking regina elena cagliari, ztl castello cagliari",
+        "og_description": "Aparcamientos gratuitos y de pago cerca de Castello, ascensores, ZTL y mapas: la guía del B&B Merì.",
+        "back": "Volver a la página principal",
+        "eyebrow": "Guía de aparcamiento · Castello, Cagliari",
+        "h1": "Dónde aparcar<br>cerca de Castello",
+        "intro": "Castello es una <strong>zona de tráfico limitado (ZTL)</strong>: los coches de los visitantes no pueden entrar en el barrio. La buena noticia es que justo fuera de las murallas hay aparcamientos gratuitos y de pago, conectados con el B&amp;B por paseos cortos y ascensores públicos. Aquí tienes todo, con mapas y tarifas.",
+        "satnav_title": "Antes de salir: en el navegador pon el aparcamiento, no la dirección del B&amp;B",
+        "satnav_text": "Si pones Via Alberto Lamarmora 18, el navegador puede meterte en la ZTL, vigilada por cámaras que multan. Elige uno de los aparcamientos de abajo y usa el botón «Ruta a pie» para el último tramo.",
+        "quick_title": "En resumen: cuál elegir",
+        "quick": [
+            ("💸", "No gastar nada", "Viale Buoncammino: plazas gratuitas de rayas blancas, unos 10 minutos a pie casi en llano.", "buoncammino"),
+            ("🪙", "Gastar poco", "Zona Regina Elena Alta: 2,50 € al día como máximo y luego ascensores hasta Castello.", "re_alta"),
+            ("🛡️", "Cubierto y abierto 24 horas", "Aparcamiento de varias plantas Regina Elena: aprox. 1,70 € la hora, 10 € al día como máximo.", "multipiano"),
+        ],
+        "map_title": "Mapa",
+        "tabs_label": "Tipos de aparcamiento",
+        "tabs": {"free": "Aparcamientos gratuitos", "paid": "Aparcamientos de pago",
+                 "lifts": "Ascensores a Castello", "tips": "Consejos útiles"},
+        "tab_intro": {
+            "free": "Gratis, pero hay que encontrar sitio: en temporada alta conviene llegar pronto o por la noche.",
+            "paid": "Las opciones más cómodas a lo largo del Viale Regina Elena, bajo las murallas de Castello. Tarifas orientativas.",
+            "lifts": "Desde los aparcamientos del Viale Regina Elena se sube a Castello sin esfuerzo con los ascensores públicos.",
+            "tips": "Unos consejos para llegar sin estrés.",
+        },
+        "spots": {
+            "buoncammino": ("Viale Buoncammino", "Gratuito",
+                [("Precio", "gratis en las rayas blancas"), ("A pie hasta el B&B", "unos 10 minutos, casi todo en llano"), ("Entrada a Castello", "Porta Cristina → Piazza Arsenale")],
+                "La avenida panorámica sobre la colina, con vistas a toda la ciudad: es el aparcamiento gratuito más cercano. Busca sitio lo más cerca posible de la <strong>Porta Cristina</strong> y entra a pie en Castello por la Piazza Arsenale. Atención: en una parte de la avenida las rayas son <strong>azules, es decir, de pago</strong>. En temporada alta puede estar lleno."),
+            "blue_free": ("Rayas azules, gratis a ciertas horas", "Gratis por la noche y los domingos",
+                [("Gratis", "domingos y festivos; de lunes a sábado 13–16 h y 20–9 h"), ("De pago", "lunes–sábado 9–13 h y 16–20 h")],
+                "Las plazas de rayas azules solo se pagan en ciertas franjas horarias. Si llegas por la noche o el fin de semana, también puedes dejar el coche gratis en las rayas azules cerca de Castello (Viale Buoncammino, Viale Regina Elena): eso sí, recuerda pagar cuando empiece la franja de pago. Mira siempre el cartel de la zona."),
+            "re_alta": ("Zona Regina Elena Alta (APCOA)", "La más económica",
+                [("Precio", "0,50 € la primera hora, luego 1 € la hora — 2,50 € al día como máximo"), ("Horario de pago", "lunes–sábado 9–13 h y 16–20 h"), ("A pie hasta el B&B", "unos 10 minutos con los ascensores")],
+                "Plazas de rayas azules al aire libre en la parte alta del Viale Regina Elena, bajo las murallas de Castello. Con su tope de 2,50 € al día, es la opción de pago más económica si te quedas varios días. Desde aquí se sube a Castello con los ascensores públicos."),
+            "re_bassa": ("Zonas Regina Elena Bassa 1 y 2 (APCOA)", "De pago",
+                [("Precio", "Bassa 1: 1 € la hora, 8 € al día como máximo · Bassa 2: 0,50 € la primera hora, luego 1 €, 7,50 € como máximo"), ("Horario de pago", "lunes–sábado 9–13 h y 16–20 h"), ("A pie hasta el B&B", "unos 10–15 minutos con los ascensores")],
+                "Más plazas de rayas azules en la parte baja del Viale Regina Elena: útiles cuando la Regina Elena Alta está llena."),
+            "multipiano": ("Aparcamiento de varias plantas Regina Elena (APCOA)", "Cubierto · 24 horas",
+                [("Precio", "aprox. 1,70 € la hora, 10 € al día como máximo"), ("Horario", "abierto 24 horas"), ("Dirección", "Viale Regina Elena 17"), ("A pie hasta el B&B", "unos 10 minutos con los ascensores")],
+                "Aparcamiento cubierto al pie de las murallas: la opción más cómoda y tranquila si dejas el coche toda la estancia. Al salir, los ascensores públicos del Viale Regina Elena te suben a Castello."),
+            "blue_paid": ("Rayas azules en el centro", "De pago",
+                [("Precio", "aprox. 1 € la hora (en algunas zonas 0,50 € la primera hora), 10 € al día como máximo"), ("Horario de pago", "lunes–sábado 9–13 h y 16–20 h; gratis domingos y festivos"), ("Cómo pagar", "en el parquímetro o con una app (por ejemplo Telepass o MoneyGo)")],
+                "También las hay en parte del Viale Buoncammino y en las calles alrededor de Castello. Las tarifas cambian según la zona: lee siempre el cartel."),
+            "lift_palazzo": ("Ascensores de la antigua Unione Sarda → Piazza Palazzo", "El más cercano al B&B",
+                [("Salida", "Viale Regina Elena, a la altura del Terrapieno"), ("Llegada", "Piazza Palazzo, junto a la catedral: a pocos pasos del B&B"), ("Precio", "gratuito")],
+                "Dos ascensores seguidos: el primero sube del Viale Regina Elena al Terrapieno y el segundo, panorámico, llega a la Piazza Palazzo. Es la conexión más directa con el B&amp;B. En verano pueden pararse en las horas de más calor."),
+            "lift_remy": ("Ascensor de Saint Remy → Bastión", "Gratuito",
+                [("Salida", "Viale Regina Elena, en los jardines bajo las murallas, a unos 100 m de Piazza Costituzione"), ("Llegada", "Bastión de Saint Remy y luego unos minutos a pie"), ("Precio", "gratuito")],
+                "Lleva a la gran terraza del Bastión de Saint Remy, a pocos minutos a pie del B&amp;B. En verano también puede pararse en las horas de más calor."),
+        },
+        "buttons": {"show": "Ver en el mapa", "open": "Abrir en Google Maps", "walk": "Ruta a pie hasta el B&B"},
+        "tips": [
+            ("🧭", "Navegador", "Pon como destino el aparcamiento elegido, no la dirección del B&amp;B: así no entrarás por error en la ZTL."),
+            ("🚫", "ZTL y cámaras", "No entres en coche en Castello: los accesos están vigilados por cámaras. Las plazas de la Piazza Indipendenza también están reservadas a los residentes."),
+            ("🌙", "Llegada por la noche o el fin de semana", "Las rayas azules son gratis los domingos, los festivos y de lunes a sábado de 20 a 9 h y de 13 a 16 h."),
+            ("🌡️", "¿Ascensores parados?", "En verano los ascensores pueden pararse en las horas de más calor. Puedes subir a pie por la Via Ubaldo Badas o aparcar en el Viale Buoncammino, que ya está a la altura de Castello."),
+            ("🧳", "Maletas pesadas", "Podemos organizar un traslado bajo petición: escríbenos antes de llegar."),
+            ("💬", "¿Dudas?", f"Escríbenos por WhatsApp al {PHONE_INTL}: te diremos dónde conviene aparcar en ese momento."),
+        ],
+        "updated": "Información comprobada en octubre de 2026 en fuentes públicas (APCOA, Telepass, Comune di Cagliari). Tarifas, horarios y funcionamiento de los ascensores pueden cambiar: mira siempre los carteles en el lugar.",
+        "sources_label": "Fuentes",
+        "help_title": "¿Necesitas ayuda?",
+        "help_text": "Escríbenos antes de salir: te recomendamos el mejor aparcamiento según tu hora de llegada. Bajo petición también organizamos el traslado.",
+    },
+}
+
+
 # ----------------------------------------------------------- utilita' --
 
-def page_url(lang):
-    return SITE if lang == "it" else f"{SITE}{lang}/"
+def url_of(folder):
+    """Indirizzo completo di una cartella del sito ('' = home italiana)."""
+    return SITE + (folder + "/" if folder else "")
 
 
-def page_path(lang):
-    return ROOT / "index.html" if lang == "it" else ROOT / lang / "index.html"
+def rel(from_dir, to_dir):
+    """Link relativo dalla cartella `from_dir` alla cartella `to_dir`."""
+    r = posixpath.relpath(to_dir or ".", from_dir or ".")
+    return "./" if r == "." else r + "/"
 
 
-def lang_href(current, target):
-    """Link relativo dalla pagina `current` alla pagina `target`."""
-    prefix = "" if current == "it" else "../"
-    href = prefix + ("" if target == "it" else f"{target}/")
-    return href or "./"
+def asset_prefix(folder):
+    """Prefisso per css/js/immagini a partire da una cartella."""
+    return "" if not folder else rel(folder, "")
 
 
 def asset_version(rel_path):
@@ -522,8 +838,32 @@ def attr(text):
     return escape(text, quote=True)
 
 
+def plain(html_text):
+    """Testo senza tag, per i dati strutturati."""
+    return unescape(re.sub(r"<[^>]+>", "", html_text))
+
+
+def linkify(escaped_text):
+    """Rende cliccabili gli indirizzi https:// in un testo gia' escapato."""
+    return re.sub(r"https://[^\s<]+[^\s<.,;:]",
+                  lambda m: f'<a href="{m.group(0)}">{m.group(0)}</a>', escaped_text)
+
+
 def json_ld(data):
     return json.dumps(data, ensure_ascii=False, indent=2).replace("</", "<\\/")
+
+
+def maps_search(query):
+    return "https://www.google.com/maps/search/?api=1&query=" + quote_plus(query)
+
+
+def maps_embed(query):
+    return "https://www.google.com/maps?q=" + quote_plus(query) + "&z=16&output=embed"
+
+
+def maps_walk(origin):
+    return ("https://www.google.com/maps/dir/?api=1&origin=" + quote_plus(origin)
+            + "&destination=" + quote_plus(DEST) + "&travelmode=walking")
 
 
 def structured_data(lang, t):
@@ -535,7 +875,7 @@ def structured_data(lang, t):
         "@type": "BedAndBreakfast",
         "name": "B&B Merì",
         "description": t["ld_description"],
-        "url": page_url(lang),
+        "url": url_of(HOME_DIR[lang]),
         "image": SITE + "assets/img/og-cover.svg",
         "logo": SITE + "assets/img/logo.svg",
         "email": EMAIL,
@@ -579,28 +919,177 @@ def structured_data(lang, t):
             for q, a in t["faq"]
         ],
     }
-    return json_ld(bnb), json_ld(faq)
+    return [("BedAndBreakfast", json_ld(bnb)), ("FAQ", json_ld(faq))]
 
 
-# ------------------------------------------------------------ pagina --
+def parking_structured_data(lang, pt):
+    page = {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "name": pt["title"],
+        "description": pt["description"],
+        "url": url_of(PARK_DIR[lang]),
+        "inLanguage": lang,
+        "about": {"@type": "BedAndBreakfast", "name": "B&B Merì", "url": url_of(HOME_DIR[lang])},
+        "mainEntity": {
+            "@type": "ItemList",
+            "itemListElement": [
+                {
+                    "@type": "ListItem",
+                    "position": i + 1,
+                    "item": {
+                        "@type": "ParkingFacility",
+                        "name": pt["spots"][key][0],
+                        "description": plain(pt["spots"][key][3]),
+                        "address": {"@type": "PostalAddress", "streetAddress": SPOTS[key]["street"],
+                                    "addressLocality": "Cagliari", "addressCountry": "IT"},
+                    },
+                }
+                for i, key in enumerate(FACILITIES)
+            ],
+        },
+    }
+    return [("WebPage", json_ld(page))]
 
-def render(lang):
-    t = T[lang]
-    p = "" if lang == "it" else "../"   # prefisso per css/js/immagini
-    ids, nav = t["ids"], t["nav"]
-    r1, r2 = t["room1"], t["room2"]
-    ld_bnb, ld_faq = structured_data(lang, t)
 
+# ------------------------------------------------- parti in comune --
+
+def head(lang, folder, alt_dirs, title, description, keywords, og_description, ld_blocks):
+    p = asset_prefix(folder)
     alternates = "\n".join(
-        f'  <link rel="alternate" hreflang="{l}" href="{page_url(l)}">' for l in LANGS)
+        f'  <link rel="alternate" hreflang="{l}" href="{url_of(alt_dirs[l])}">' for l in LANGS)
+    ld = "\n\n".join(
+        f"""  <!-- Dati strutturati: {name} -->
+  <script type="application/ld+json">
+{data}
+  </script>""" for name, data in ld_blocks)
+    return f"""<!DOCTYPE html>
+<html lang="{lang}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Pagina generata da tools/build_pages.py: modifica i testi li', non qui. -->
+  <title>{escape(title)}</title>
+  <meta name="description" content="{attr(description)}">
+  <meta name="keywords" content="{attr(keywords)}">
+  <link rel="canonical" href="{url_of(folder)}">
+{alternates}
+  <link rel="alternate" hreflang="x-default" href="{url_of(alt_dirs["it"])}">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{attr(title)}">
+  <meta property="og:description" content="{attr(og_description)}">
+  <meta property="og:url" content="{url_of(folder)}">
+  <meta property="og:image" content="{SITE}assets/img/og-cover.svg">
+  <meta property="og:locale" content="{T[lang]["og_locale"]}">
+  <meta property="og:site_name" content="B&amp;B Merì">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="icon" href="{p}assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{p}css/style.css?v={asset_version("css/style.css")}">
+
+{ld}
+</head>
+<body>
+"""
+
+
+def site_header(lang, folder, page):
+    """Intestazione con menu. `page` e' "home" oppure "parking"."""
+    t = T[lang]
+    ids, nav = t["ids"], t["nav"]
+    p = asset_prefix(folder)
+    home = "" if page == "home" else rel(folder, HOME_DIR[lang])
+    dirs = HOME_DIR if page == "home" else PARK_DIR
+    parking_href = "#top" if page == "parking" else rel(folder, PARK_DIR[lang])
+    current = ' aria-current="page"' if page == "parking" else ""
     lang_switch = "".join(
-        f'<a href="{lang_href(lang, l)}" hreflang="{l}" lang="{l}"'
+        f'<a href="{rel(folder, dirs[l])}" hreflang="{l}" lang="{l}"'
         + (' aria-current="page"' if l == lang else "")
         + f'>{l.upper()}</a>'
         for l in LANGS)
-    footer_langs = "\n      ".join(
-        f'<a href="{lang_href(lang, l)}" hreflang="{l}" lang="{l}">{T[l]["lang_name"]}</a>'
+    return f"""
+<header class="site-header" id="top">
+  <div class="container header-inner">
+    <a href="{home or '#top'}" class="logo" aria-label="B&amp;B Merì — home">
+      <img class="logo-mark" src="{p}assets/img/logo-mark.svg" alt="" width="46" height="46">
+      <span class="logo-text">Merì <em>Bed &amp; Breakfast · Cagliari</em></span>
+    </a>
+    <nav class="main-nav" aria-label="{attr(t["nav_label"])}">
+      <button class="nav-toggle" aria-expanded="false" aria-controls="nav-menu" aria-label="{attr(t["menu_open"])}">
+        <span></span><span></span><span></span>
+      </button>
+      <ul id="nav-menu" class="nav-menu">
+        <li><a href="{home}#{ids["rooms"]}">{nav["rooms"]}</a></li>
+        <li><a href="{home}#{ids["amenities"]}">{nav["amenities"]}</a></li>
+        <li><a href="{home}#{ids["arrival"]}">{nav["arrival"]}</a></li>
+        <li><a href="{parking_href}"{current}>{nav["parking"]}</a></li>
+        <li><a href="{home}#{ids["faq"]}">{nav["faq"]}</a></li>
+        <li><a href="{home}#{ids["contact"]}" class="nav-cta">{nav["book"]}</a></li>
+        <li class="lang-switch">{lang_switch}</li>
+      </ul>
+    </nav>
+  </div>
+</header>
+"""
+
+
+def site_footer(lang, folder, page):
+    t = T[lang]
+    ids, nav = t["ids"], t["nav"]
+    p = asset_prefix(folder)
+    home = "" if page == "home" else rel(folder, HOME_DIR[lang])
+    dirs = HOME_DIR if page == "home" else PARK_DIR
+    parking_href = "#top" if page == "parking" else rel(folder, PARK_DIR[lang])
+    whatsapp = f"https://wa.me/{WHATSAPP}?text={quote(t['whatsapp_text'])}"
+    other_langs = "\n      ".join(
+        f'<a href="{rel(folder, dirs[l])}" hreflang="{l}" lang="{l}">{T[l]["lang_name"]}</a>'
         for l in LANGS if l != lang)
+    return f"""
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <div>
+      <p class="footer-logo"><img src="{p}assets/img/logo-mark.svg" alt="" width="34" height="34"> B&amp;B Merì</p>
+      <p>{t["address_line"]}</p>
+      <p><a href="tel:{TEL}">{PHONE_INTL}</a> · <a href="{attr(whatsapp)}" target="_blank" rel="noopener">WhatsApp</a></p>
+      <p><a href="mailto:{EMAIL}">{EMAIL}</a></p>
+      <p class="footer-cin">CIN: {CIN}</p>
+    </div>
+    <nav aria-label="{attr(t["footer_label"])}">
+      <a href="{home}#{ids["rooms"]}">{nav["rooms"]}</a>
+      <a href="{home}#{ids["amenities"]}">{nav["amenities"]}</a>
+      <a href="{home}#{ids["location"]}">{nav["location"]}</a>
+      <a href="{home}#{ids["arrival"]}">{nav["arrival"]}</a>
+      <a href="{parking_href}">{nav["parking"]}</a>
+      <a href="{home}#{ids["faq"]}">{nav["faq"]}</a>
+      <a href="{CHECKIN_URL}" target="_blank" rel="noopener">{t["checkin_title"]}</a>
+      {other_langs}
+    </nav>
+  </div>
+  <div class="container footer-legal">
+    <p>© 2026 B&amp;B Merì · {t["rights"]}</p>
+  </div>
+</footer>
+
+<script src="{p}js/main.js?v={asset_version("js/main.js")}" defer></script>
+</body>
+</html>
+"""
+
+
+# --------------------------------------------------------- home page --
+
+def render_home(lang):
+    t = T[lang]
+    folder = HOME_DIR[lang]
+    p = asset_prefix(folder)
+    ids = t["ids"]
+    r1, r2 = t["room1"], t["room2"]
+    parking_href = rel(folder, PARK_DIR[lang])
 
     badges = "\n".join(f"        <li>✓ {b}</li>" for b in t["badges"])
     intro = "\n".join(f"      <p>{para}</p>" for para in t["intro_p"])
@@ -612,6 +1101,8 @@ def render(lang):
     distances = "\n".join(
         f"          <li><strong>{place}</strong><span>{time}</span></li>"
         for place, time in t["distances"])
+    arrival_items = [(icon, title, text.replace("{parking}", parking_href))
+                     for icon, title, text in t["arrival"]]
     arrival = "\n".join(
         f"""        <li>
           <span class="arrival-icon">{icon}</span>
@@ -619,80 +1110,19 @@ def render(lang):
             <strong class="arrival-title">{title}</strong>
             {text}
           </div>
-        </li>""" for icon, title, text in t["arrival"])
+        </li>""" for icon, title, text in arrival_items)
     faq = "\n".join(
         f"""      <details class="faq-item">
         <summary>{escape(q)}</summary>
-        <p>{escape(a)}</p>
+        <p>{linkify(escape(a))}</p>
       </details>""" for q, a in t["faq"])
 
     whatsapp = f"https://wa.me/{WHATSAPP}?text={quote(t['whatsapp_text'])}"
     mailto = f"mailto:{EMAIL}?subject={quote(t['mail_subject'])}"
 
-    return f"""<!DOCTYPE html>
-<html lang="{lang}">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- Pagina generata da tools/build_pages.py: modifica i testi li', non qui. -->
-  <title>{escape(t["title"])}</title>
-  <meta name="description" content="{attr(t["description"])}">
-  <meta name="keywords" content="{attr(t["keywords"])}">
-  <link rel="canonical" href="{page_url(lang)}">
-{alternates}
-  <link rel="alternate" hreflang="x-default" href="{SITE}">
-
-  <!-- Open Graph -->
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="{attr(t["title"])}">
-  <meta property="og:description" content="{attr(t["og_description"])}">
-  <meta property="og:url" content="{page_url(lang)}">
-  <meta property="og:image" content="{SITE}assets/img/og-cover.svg">
-  <meta property="og:locale" content="{t["og_locale"]}">
-  <meta property="og:site_name" content="B&amp;B Merì">
-  <meta name="twitter:card" content="summary_large_image">
-
-  <link rel="icon" href="{p}assets/img/favicon.svg" type="image/svg+xml">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{p}css/style.css?v={asset_version("css/style.css")}">
-
-  <!-- Dati strutturati: BedAndBreakfast -->
-  <script type="application/ld+json">
-{ld_bnb}
-  </script>
-
-  <!-- Dati strutturati: FAQ -->
-  <script type="application/ld+json">
-{ld_faq}
-  </script>
-</head>
-<body>
-
-<header class="site-header" id="top">
-  <div class="container header-inner">
-    <a href="#top" class="logo" aria-label="B&amp;B Merì — home">
-      <img class="logo-mark" src="{p}assets/img/logo-mark.svg" alt="" width="46" height="46">
-      <span class="logo-text">Merì <em>Bed &amp; Breakfast · Cagliari</em></span>
-    </a>
-    <nav class="main-nav" aria-label="{attr(t["nav_label"])}">
-      <button class="nav-toggle" aria-expanded="false" aria-controls="nav-menu" aria-label="{attr(t["menu_open"])}">
-        <span></span><span></span><span></span>
-      </button>
-      <ul id="nav-menu" class="nav-menu">
-        <li><a href="#{ids["rooms"]}">{nav["rooms"]}</a></li>
-        <li><a href="#{ids["amenities"]}">{nav["amenities"]}</a></li>
-        <li><a href="#{ids["location"]}">{nav["location"]}</a></li>
-        <li><a href="#{ids["arrival"]}">{nav["arrival"]}</a></li>
-        <li><a href="#{ids["faq"]}">{nav["faq"]}</a></li>
-        <li><a href="#{ids["contact"]}" class="nav-cta">{nav["book"]}</a></li>
-        <li class="lang-switch">{lang_switch}</li>
-      </ul>
-    </nav>
-  </div>
-</header>
-
+    return head(lang, folder, HOME_DIR, t["title"], t["description"], t["keywords"],
+                t["og_description"], structured_data(lang, t)) \
+        + site_header(lang, folder, "home") + f"""
 <main>
 
   <!-- HERO -->
@@ -842,49 +1272,159 @@ def render(lang):
   </section>
 
 </main>
+""" + site_footer(lang, folder, "home")
 
-<footer class="site-footer">
-  <div class="container footer-inner">
-    <div>
-      <p class="footer-logo"><img src="{p}assets/img/logo-mark.svg" alt="" width="34" height="34"> B&amp;B Merì</p>
-      <p>{t["address_line"]}</p>
-      <p><a href="tel:{TEL}">{PHONE_INTL}</a> · <a href="{attr(whatsapp)}" target="_blank" rel="noopener">WhatsApp</a></p>
-      <p><a href="mailto:{EMAIL}">{EMAIL}</a></p>
-      <p class="footer-cin">CIN: {CIN}</p>
+
+# ------------------------------------------------- pagina parcheggi --
+
+def render_parking(lang):
+    t, pt = T[lang], P[lang]
+    folder = PARK_DIR[lang]
+    home = rel(folder, HOME_DIR[lang])
+    btn = pt["buttons"]
+    first = "buoncammino"
+    whatsapp = f"https://wa.me/{WHATSAPP}?text={quote(t['whatsapp_text'])}"
+
+    quick = "\n".join(
+        f"""        <li><a class="quick-pick" href="#spot-{key}" data-spot="{key}">
+          <span class="quick-icon" aria-hidden="true">{icon}</span>
+          <strong>{title}</strong>
+          <span>{text}</span>
+        </a></li>""" for icon, title, text, key in pt["quick"])
+
+    def card(key):
+        name, badge, facts, text = pt["spots"][key]
+        s = SPOTS[key]
+        facts_html = "\n".join(
+            f"              <div><dt>{label}</dt><dd>{value}</dd></div>" for label, value in facts)
+        actions = ""
+        if s["map"]:
+            actions = f"""
+            <div class="park-actions">
+              <button type="button" class="btn btn-outline btn-sm" data-map-src="{attr(maps_embed(s["map"]))}" data-map-name="{attr(name)}">📍 {btn["show"]}</button>
+              <a class="btn btn-ghost btn-sm" href="{attr(maps_search(s["map"]))}" target="_blank" rel="noopener">🗺️ {btn["open"]}</a>
+              <a class="btn btn-primary btn-sm" href="{attr(maps_walk(s["from"]))}" target="_blank" rel="noopener">🚶 {btn["walk"]}</a>
+            </div>"""
+        return f"""          <article class="park-card park-card--{s["tab"]}" id="spot-{key}">
+            <div class="park-head">
+              <h3>{name}</h3>
+              <span class="park-badge">{badge}</span>
+            </div>
+            <dl class="park-facts">
+{facts_html}
+            </dl>
+            <p>{text}</p>{actions}
+          </article>"""
+
+    def panel(tab):
+        if tab == "tips":
+            body = "\n".join(
+                f"""          <li><span class="tip-icon" aria-hidden="true">{icon}</span><div><strong>{title}</strong><p>{text}</p></div></li>"""
+                for icon, title, text in pt["tips"])
+            body = f'          <ul class="tip-list">\n{body}\n          </ul>'
+        else:
+            body = "\n".join(card(k) for k, s in SPOTS.items() if s["tab"] == tab)
+        return f"""        <div class="tab-panel" id="{tab}" role="tabpanel" aria-labelledby="tab-{tab}">
+          <h2 class="panel-title">{pt["tabs"][tab]}</h2>
+          <p class="tab-intro">{pt["tab_intro"][tab]}</p>
+{body}
+        </div>"""
+
+    tabs = "\n".join(
+        f'        <button type="button" role="tab" id="tab-{tab}" aria-controls="{tab}" aria-selected="{"true" if i == 0 else "false"}">{pt["tabs"][tab]}</button>'
+        for i, tab in enumerate(TABS))
+    panels = "\n".join(panel(tab) for tab in TABS)
+    sources = " · ".join(
+        f'<a href="{attr(url)}" target="_blank" rel="noopener">{escape(label)}</a>' for label, url in SOURCES)
+
+    return head(lang, folder, PARK_DIR, pt["title"], pt["description"], pt["keywords"],
+                pt["og_description"], parking_structured_data(lang, pt)) \
+        + site_header(lang, folder, "parking") + f"""
+<main class="parking-page">
+
+  <section class="page-hero">
+    <div class="container narrow">
+      <a class="back-link" href="{home}">← {pt["back"]}</a>
+      <p class="hero-eyebrow">{pt["eyebrow"]}</p>
+      <h1>{pt["h1"]}</h1>
+      <p class="hero-sub">{pt["intro"]}</p>
+      <div class="satnav-tip">
+        <span class="satnav-icon" aria-hidden="true">🧭</span>
+        <div>
+          <strong>{pt["satnav_title"]}</strong>
+          <p>{pt["satnav_text"]}</p>
+        </div>
+      </div>
     </div>
-    <nav aria-label="{attr(t["footer_label"])}">
-      <a href="#{ids["rooms"]}">{nav["rooms"]}</a>
-      <a href="#{ids["amenities"]}">{nav["amenities"]}</a>
-      <a href="#{ids["location"]}">{nav["location"]}</a>
-      <a href="#{ids["arrival"]}">{nav["arrival"]}</a>
-      <a href="#{ids["faq"]}">{nav["faq"]}</a>
-      <a href="{CHECKIN_URL}" target="_blank" rel="noopener">{t["checkin_title"]}</a>
-      {footer_langs}
-    </nav>
-  </div>
-  <div class="container footer-legal">
-    <p>© 2026 B&amp;B Merì · {t["rights"]}</p>
-  </div>
-</footer>
+  </section>
 
-<script src="{p}js/main.js?v={asset_version("js/main.js")}" defer></script>
-</body>
-</html>
-"""
+  <section class="section quick-section">
+    <div class="container">
+      <h2>{pt["quick_title"]}</h2>
+      <ul class="quick-picks">
+{quick}
+      </ul>
+    </div>
+  </section>
 
+  <section class="section section-alt parking-guide">
+    <div class="container">
+      <div class="tabs" role="tablist" aria-label="{attr(pt["tabs_label"])}" hidden>
+{tabs}
+      </div>
+      <div class="parking-layout">
+        <aside class="parking-map" aria-label="{attr(pt["map_title"])}">
+          <div class="map-sticky">
+            <iframe id="park-map" title="{attr(pt["map_title"])}" src="{attr(maps_embed(SPOTS[first]["map"]))}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+            <p class="map-caption">📍 <span id="park-map-name">{pt["spots"][first][0]}</span></p>
+          </div>
+        </aside>
+        <div class="parking-panels">
+{panels}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section parking-sources">
+    <div class="container narrow">
+      <p class="parking-updated">{pt["updated"]}</p>
+      <p class="parking-source-list">{pt["sources_label"]}: {sources}</p>
+    </div>
+  </section>
+
+  <section class="contact section section-dark">
+    <div class="container narrow center">
+      <h2>{pt["help_title"]}</h2>
+      <p>{pt["help_text"]}</p>
+      <div class="contact-actions">
+        <a class="btn btn-primary btn-lg" href="{attr(whatsapp)}" target="_blank" rel="noopener">💬 WhatsApp</a>
+        <a class="btn btn-ghost btn-lg" href="tel:{TEL}">📞 {t["phone_label"]}</a>
+        <a class="btn btn-ghost btn-lg" href="{home}">← {pt["back"]}</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+""" + site_footer(lang, folder, "parking")
+
+
+# --------------------------------------------------------------- sitemap --
 
 def sitemap():
-    alternates = "".join(
-        f'\n    <xhtml:link rel="alternate" hreflang="{l}" href="{page_url(l)}"/>' for l in LANGS)
-    alternates += f'\n    <xhtml:link rel="alternate" hreflang="x-default" href="{SITE}"/>'
-    urls = "".join(
-        f"""
+    def entry(dirs, lang, priority):
+        alternates = "".join(
+            f'\n    <xhtml:link rel="alternate" hreflang="{l}" href="{url_of(dirs[l])}"/>' for l in LANGS)
+        alternates += f'\n    <xhtml:link rel="alternate" hreflang="x-default" href="{url_of(dirs["it"])}"/>'
+        return f"""
   <url>
-    <loc>{page_url(l)}</loc>
+    <loc>{url_of(dirs[lang])}</loc>
     <lastmod>{LASTMOD}</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>{"1.0" if l == "it" else "0.9"}</priority>{alternates}
-  </url>""" for l in LANGS)
+    <priority>{priority}</priority>{alternates}
+  </url>"""
+    urls = "".join(entry(HOME_DIR, l, "1.0" if l == "it" else "0.9") for l in LANGS)
+    urls += "".join(entry(PARK_DIR, l, "0.8") for l in LANGS)
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">{urls}
@@ -894,10 +1434,12 @@ def sitemap():
 
 def main():
     for lang in LANGS:
-        path = page_path(lang)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(render(lang), encoding="utf-8")
-        print("scritto", path.relative_to(ROOT))
+        for folder, html in ((HOME_DIR[lang], render_home(lang)),
+                             (PARK_DIR[lang], render_parking(lang))):
+            path = ROOT / folder / "index.html"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(html, encoding="utf-8")
+            print("scritto", path.relative_to(ROOT))
     (ROOT / "sitemap.xml").write_text(sitemap(), encoding="utf-8")
     print("scritto sitemap.xml")
 

@@ -650,11 +650,213 @@ h3 { font-size: 1.4rem; }
   opacity: 0.6;
 }
 
+/* ---------- Pagina parcheggi ---------- */
+
+.text-link { font-weight: 600; color: var(--terracotta); }
+
+.page-hero {
+  background: linear-gradient(165deg, var(--sand) 0%, var(--sand-deep) 100%);
+  padding-block: clamp(2.5rem, 7vw, 4.5rem);
+}
+.page-hero h1 { margin-bottom: 1rem; }
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 1.4rem;
+  font-weight: 600;
+  font-size: 0.92rem;
+  text-decoration: none;
+  color: var(--sea);
+}
+.back-link:hover { color: var(--terracotta); }
+
+.satnav-tip {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-top: 1.8rem;
+  padding: 1.2rem 1.4rem;
+  background: var(--white);
+  border-left: 4px solid var(--terracotta);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+.satnav-icon { font-size: 1.6rem; line-height: 1.2; }
+.satnav-tip strong { display: block; margin-bottom: 0.25rem; }
+.satnav-tip p { color: var(--ink-soft); font-size: 0.97rem; }
+
+.quick-section { padding-block: clamp(2.5rem, 6vw, 4rem); }
+.quick-picks {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+  gap: 1rem;
+  margin-top: 1.4rem;
+}
+.quick-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  height: 100%;
+  padding: 1.4rem;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--ink);
+  transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.quick-pick:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow);
+  border-color: var(--terracotta);
+}
+.quick-icon { font-size: 1.8rem; }
+.quick-pick strong {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+.quick-pick span:last-child { color: var(--ink-soft); font-size: 0.95rem; }
+
+/* Schede: gratuiti / a pagamento / ascensori / consigli */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.8rem;
+}
+.tabs[hidden] { display: none; }
+.tabs button {
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 0.7rem 1.2rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--line);
+  background: var(--white);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.tabs button:hover { border-color: var(--sea); color: var(--sea); }
+.tabs button[aria-selected="true"] {
+  background: var(--sea);
+  border-color: var(--sea);
+  color: var(--sand);
+}
+
+.parking-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 2rem;
+  align-items: start;
+}
+.parking-map { order: 2; }
+.map-sticky { position: sticky; top: 90px; }
+.parking-map iframe {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border: 0;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  background: var(--sand-deep);
+}
+.map-caption { margin-top: 0.6rem; font-weight: 600; color: var(--sea); }
+
+.tab-panel + .tab-panel { margin-top: 2.5rem; }
+.tab-panel[hidden] { display: none; }
+.panel-title { font-size: clamp(1.5rem, 3vw, 2rem); margin-bottom: 0.4rem; }
+.tab-intro { color: var(--ink-soft); margin-bottom: 1.2rem; }
+
+.park-card {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-bottom: 1.2rem;
+  scroll-margin-top: 100px;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.park-card.is-highlighted {
+  border-color: var(--terracotta);
+  box-shadow: 0 0 0 3px rgba(196, 96, 46, 0.18);
+}
+.park-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.9rem;
+}
+.park-head h3 { font-size: 1.3rem; }
+.park-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  background: var(--sand-deep);
+  color: var(--sea);
+}
+.park-card--free .park-badge { background: #e3efe6; color: #2f6b45; }
+.park-card--paid .park-badge { background: #f6e3d8; color: var(--terracotta-dark); }
+.park-card--lifts .park-badge { background: #dceaee; color: var(--sea); }
+
+.park-facts { display: grid; gap: 0.5rem; margin-bottom: 1rem; }
+.park-facts div {
+  display: grid;
+  grid-template-columns: minmax(120px, 34%) 1fr;
+  gap: 0.8rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px dashed var(--line);
+  font-size: 0.95rem;
+}
+.park-facts dt { font-weight: 600; color: var(--ink); }
+.park-facts dd { color: var(--ink-soft); }
+.park-card > p { color: var(--ink-soft); font-size: 0.97rem; }
+
+.park-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1.1rem;
+}
+.btn-sm { padding: 0.55rem 1rem; font-size: 0.85rem; }
+button.btn { font: inherit; font-weight: 600; font-size: 0.85rem; cursor: pointer; }
+button.btn-outline { background: transparent; }
+
+.tip-list { list-style: none; display: grid; gap: 1rem; }
+.tip-list li {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1.1rem 1.3rem;
+}
+.tip-icon { font-size: 1.5rem; line-height: 1.3; }
+.tip-list strong { display: block; margin-bottom: 0.2rem; }
+.tip-list p { color: var(--ink-soft); font-size: 0.95rem; }
+
+.parking-sources { padding-block: 2.5rem; }
+.parking-updated { color: var(--ink-soft); font-style: italic; }
+.parking-source-list { margin-top: 0.6rem; font-size: 0.85rem; color: var(--ink-soft); }
+.parking-source-list a { color: var(--sea); }
+
 /* ---------- Responsive ---------- */
 
 @media (max-width: 860px) {
   .location-grid { grid-template-columns: 1fr; }
   .location-media { order: -1; }
+
+  .parking-layout { grid-template-columns: 1fr; }
+  .parking-map { order: -1; }
+  .map-sticky { position: static; }
+  .park-facts div { grid-template-columns: 1fr; gap: 0.1rem; }
 }
 
 /* Menu a tendina: scatta prima dei 720px perche' con 4 lingue

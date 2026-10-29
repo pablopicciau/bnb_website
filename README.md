@@ -8,11 +8,15 @@ CSS e JavaScript vanilla, pubblicato con GitHub Pages su
 ## Struttura
 
 ```
-index.html                    Home in italiano      ┐
-en/index.html                 Home in inglese       │ generate da
-fr/index.html                 Home in francese      │ tools/build_pages.py
-es/index.html                 Home in spagnolo      │
-sitemap.xml                   Mappa del sito        ┘
+index.html                    Home in italiano            ┐
+en/index.html                 Home in inglese             │
+fr/index.html                 Home in francese            │
+es/index.html                 Home in spagnolo            │ generate da
+parcheggi/index.html          Guida ai parcheggi (IT)     │ tools/build_pages.py
+en/parking/index.html         Guida ai parcheggi (EN)     │
+fr/stationnement/index.html   Guida ai parcheggi (FR)     │
+es/aparcamiento/index.html    Guida ai parcheggi (ES)     │
+sitemap.xml                   Mappa del sito              ┘
 tools/build_pages.py          Tutti i testi delle 4 lingue + generatore
 404.html                      Pagina "non trovata"
 css/style.css                 Stile del sito
@@ -33,8 +37,11 @@ Le quattro home **non vanno modificate a mano**: tutti i testi stanno in
 python3 tools/build_pages.py
 ```
 
-Lo script rigenera `index.html`, `en/`, `fr/`, `es/` e `sitemap.xml`, così le
-lingue restano sempre allineate. Contatti, link del check-in e indirizzo sono
+Lo script rigenera le home, le guide ai parcheggi e `sitemap.xml`, così le
+lingue restano sempre allineate. I testi della guida ai parcheggi sono nel
+dizionario `P`; posizioni per le mappe e schede in `SPOTS`. Le tariffe dei
+parcheggi sono state verificate a ottobre 2026 (fonti in `SOURCES`):
+ricontrollale ogni tanto. Contatti, link del check-in e indirizzo sono
 in cima allo script (costanti `PHONE`, `WHATSAPP`, `EMAIL`, `CHECKIN_URL`,
 `CIN`).
 
