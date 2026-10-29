@@ -11,6 +11,7 @@ parcheggi (parcheggi/, en/parking/, fr/stationnement/, es/aparcamiento/)
 e sitemap.xml, cosi' le quattro lingue restano sempre allineate.
 """
 import hashlib
+import os
 import json
 import posixpath
 import re
@@ -28,6 +29,14 @@ WHATSAPP = "393520368357"
 EMAIL = "meri.bnb.cagliari@gmail.com"
 CHECKIN_URL = "https://form.jotform.com/262836960089066"
 CIN = "IT092009C2000U6994"   # Codice Identificativo Nazionale della struttura
+
+# Check-in online sul sito. Il modulo invia i dati al gestionale (VPS), che
+# li salva, manda le email e risponde con le istruzioni da mostrare.
+# Finche' il gestionale non e' pronto resta spento: i pulsanti portano a
+# CHECKIN_URL (Jotform). Messo a True, tutti i pulsanti portano al modulo.
+# Anteprima senza accenderlo: MERI_PREVIEW=1 python3 tools/build_pages.py
+CHECKIN_FORM_LIVE = False
+CHECKIN_API = "https://gestionale.meribnb.it/api/checkin"
 STREET = "Via Alberto Lamarmora 18"
 MAPS_URL = "https://www.google.com/maps/search/?api=1&query=Via+Alberto+Lamarmora+18%2C+Cagliari"
 LASTMOD = "2026-10-29"
@@ -503,6 +512,8 @@ T = {
 # Dove si trova la pagina parcheggi in ogni lingua (cartella del sito)
 HOME_DIR = {"it": "", "en": "en", "fr": "fr", "es": "es"}
 PARK_DIR = {"it": "parcheggi", "en": "en/parking", "fr": "fr/stationnement", "es": "es/aparcamiento"}
+CHECKIN_DIR = {"it": "checkin", "en": "en/check-in", "fr": "fr/check-in", "es": "es/check-in"}
+PAGE_DIRS = {"home": HOME_DIR, "parking": PARK_DIR, "checkin": CHECKIN_DIR}
 
 # Destinazione del percorso a piedi su Google Maps
 DEST = "Via Alberto Lamarmora 18, 09124 Cagliari"
@@ -823,6 +834,13 @@ def rel(from_dir, to_dir):
     return "./" if r == "." else r + "/"
 
 
+def checkin_attrs(lang, folder):
+    """Attributi del link al check-in: modulo del sito se acceso, altrimenti Jotform."""
+    if CHECKIN_FORM_LIVE:
+        return f'href="{rel(folder, CHECKIN_DIR[lang])}"'
+    return f'href="{CHECKIN_URL}" target="_blank" rel="noopener"'
+
+
 def asset_prefix(folder):
     """Prefisso per css/js/immagini a partire da una cartella."""
     return "" if not folder else rel(folder, "")
@@ -954,7 +972,7 @@ def parking_structured_data(lang, pt):
 
 # ------------------------------------------------- parti in comune --
 
-def head(lang, folder, alt_dirs, title, description, keywords, og_description, ld_blocks):
+def head(lang, folder, alt_dirs, title, description, keywords, og_description, ld_blocks, extra_meta=""):
     p = asset_prefix(folder)
     alternates = "\n".join(
         f'  <link rel="alternate" hreflang="{l}" href="{url_of(alt_dirs[l])}">' for l in LANGS)
@@ -971,7 +989,7 @@ def head(lang, folder, alt_dirs, title, description, keywords, og_description, l
   <!-- Pagina generata da tools/build_pages.py: modifica i testi li', non qui. -->
   <title>{escape(title)}</title>
   <meta name="description" content="{attr(description)}">
-  <meta name="keywords" content="{attr(keywords)}">
+  <meta name="keywords" content="{attr(keywords)}">{extra_meta}
   <link rel="canonical" href="{url_of(folder)}">
 {alternates}
   <link rel="alternate" hreflang="x-default" href="{url_of(alt_dirs["it"])}">
@@ -1004,7 +1022,7 @@ def site_header(lang, folder, page):
     ids, nav = t["ids"], t["nav"]
     p = asset_prefix(folder)
     home = "" if page == "home" else rel(folder, HOME_DIR[lang])
-    dirs = HOME_DIR if page == "home" else PARK_DIR
+    dirs = PAGE_DIRS[page]
     parking_href = "#top" if page == "parking" else rel(folder, PARK_DIR[lang])
     current = ' aria-current="page"' if page == "parking" else ""
     lang_switch = "".join(
@@ -1043,7 +1061,7 @@ def site_footer(lang, folder, page):
     ids, nav = t["ids"], t["nav"]
     p = asset_prefix(folder)
     home = "" if page == "home" else rel(folder, HOME_DIR[lang])
-    dirs = HOME_DIR if page == "home" else PARK_DIR
+    dirs = PAGE_DIRS[page]
     parking_href = "#top" if page == "parking" else rel(folder, PARK_DIR[lang])
     whatsapp = f"https://wa.me/{WHATSAPP}?text={quote(t['whatsapp_text'])}"
     other_langs = "\n      ".join(
@@ -1066,7 +1084,7 @@ def site_footer(lang, folder, page):
       <a href="{home}#{ids["arrival"]}">{nav["arrival"]}</a>
       <a href="{parking_href}">{nav["parking"]}</a>
       <a href="{home}#{ids["faq"]}">{nav["faq"]}</a>
-      <a href="{CHECKIN_URL}" target="_blank" rel="noopener">{t["checkin_title"]}</a>
+      <a {checkin_attrs(lang, folder)}>{t["checkin_title"]}</a>
       {other_langs}
     </nav>
   </div>
@@ -1130,7 +1148,7 @@ def render_home(lang):
     <div class="container hero-inner">
       <p class="hero-eyebrow">{t["hero_eyebrow"]}</p>
       <h1>{t["h1"]}</h1>
-      <a class="checkin-cta" href="{CHECKIN_URL}" target="_blank" rel="noopener">
+      <a class="checkin-cta" {checkin_attrs(lang, folder)}>
         <span class="checkin-icon" aria-hidden="true">🗝️</span>
         <span class="checkin-text">
           <strong>{t["checkin_title"]}</strong>
@@ -1409,6 +1427,346 @@ def render_parking(lang):
 """ + site_footer(lang, folder, "parking")
 
 
+# ------------------------------------------------ pagina check-in --
+#
+# Campi pensati per la registrazione su Alloggiati Web: ospite principale con
+# documento, accompagnatori con i soli dati anagrafici. I nomi dei campi
+# (guests[0][first_name], ...) sono quelli che il gestionale riceve: vedi
+# docs/checkin-gestionale.md.
+
+C = {
+    # ===================================================== ITALIANO =====
+    "it": {
+        "title": "Check-in online — B&B Merì",
+        "description": "Check-in online per gli ospiti del B&B Merì a Cagliari.",
+        "eyebrow": "Check-in online",
+        "h1": "Benvenuti da Merì",
+        "intro": "Compila il modulo prima dell'arrivo: bastano pochi minuti. I dati ci servono per la registrazione degli ospiti, obbligatoria per legge. Alla fine vedrai le istruzioni per arrivare ed entrare, e le riceverai anche via email.",
+        "required_note": "I campi con * sono obbligatori.",
+        "s_stay": "Il tuo soggiorno",
+        "arrival": "Data di arrivo", "departure": "Data di partenza",
+        "guests_count": "Numero di ospiti",
+        "arrival_time": "Orario di arrivo previsto", "arrival_time_hint": "Il check-in è dalle 15:00 alle 20:00.",
+        "booking_ref": "Numero di prenotazione", "booking_ref_hint": "Lo trovi nella conferma di Booking.",
+        "s_contact": "Contatti",
+        "email": "Email", "email_hint": "Qui ti mandiamo la conferma e le istruzioni.",
+        "phone": "Telefono (WhatsApp)",
+        "s_main": "Ospite principale", "s_main_hint": "Inserisci i dati del documento con cui viaggi.",
+        "s_guest": "Ospite {n}", "s_guest_hint": "Per gli accompagnatori bastano i dati anagrafici.",
+        "first_name": "Nome", "last_name": "Cognome",
+        "sex": "Sesso", "sex_m": "Maschio", "sex_f": "Femmina",
+        "birth_date": "Data di nascita", "birth_country": "Stato di nascita",
+        "birth_place": "Comune o città di nascita", "birth_province": "Provincia (solo se nato in Italia)",
+        "citizenship": "Cittadinanza",
+        "doc_type": "Tipo di documento", "doc_id": "Carta d'identità", "doc_passport": "Passaporto", "doc_license": "Patente di guida",
+        "doc_number": "Numero del documento", "doc_place": "Rilasciato da (comune o Stato)",
+        "doc_front": "Foto del documento (fronte)", "doc_back": "Foto del documento (retro)",
+        "doc_photo": "Foto del documento",
+        "doc_hint": "Foto nitida con tutti i dati leggibili. JPG, PNG o PDF, massimo 10 MB.",
+        "s_other": "Altro", "notes": "Note o richieste", "notes_hint": "Per esempio: arrivo in auto, richiesta di transfer.",
+        "privacy_title": "Privacy",
+        "privacy_text": f"I tuoi dati sono trattati da B&amp;B Merì solo per la registrazione degli ospiti prevista dalla legge (art. 109 TULPS, comunicazione alla Questura tramite il portale Alloggiati Web) e per la gestione del soggiorno. Non vengono ceduti a terzi. Le foto dei documenti vengono cancellate dopo la registrazione. Puoi chiedere l'accesso, la correzione o la cancellazione dei tuoi dati scrivendo a {EMAIL}.",
+        "consent": "Ho letto l'informativa e acconsento al trattamento dei dati per la registrazione.",
+        "submit": "Invia il check-in", "sending": "Invio in corso…",
+        "ok_title": "Check-in completato, grazie!",
+        "ok_email": "Ti abbiamo inviato una copia di queste istruzioni all'indirizzo email indicato.",
+        "err_title": "Non siamo riusciti a inviare il modulo.",
+        "err_text": "Riprova tra poco oppure scrivici su WhatsApp: ti aiutiamo subito.",
+        "err_file": "Il file «{name}» supera i 10 MB: scegli una foto più leggera.",
+        "err_dates": "La data di partenza deve essere successiva a quella di arrivo.",
+    },
+
+    # ====================================================== ENGLISH =====
+    "en": {
+        "title": "Online check-in — B&B Merì",
+        "description": "Online check-in for guests of B&B Merì in Cagliari.",
+        "eyebrow": "Online check-in",
+        "h1": "Welcome to Merì",
+        "intro": "Please fill in this form before you arrive: it only takes a few minutes. We need these details to register our guests, as required by Italian law. At the end you will see how to get here and get in, and you will also receive the instructions by email.",
+        "required_note": "Fields marked * are required.",
+        "s_stay": "Your stay",
+        "arrival": "Arrival date", "departure": "Departure date",
+        "guests_count": "Number of guests",
+        "arrival_time": "Expected arrival time", "arrival_time_hint": "Check-in is from 3:00 PM to 8:00 PM.",
+        "booking_ref": "Booking number", "booking_ref_hint": "You will find it in your Booking.com confirmation.",
+        "s_contact": "Contact details",
+        "email": "Email", "email_hint": "We will send the confirmation and instructions here.",
+        "phone": "Phone (WhatsApp)",
+        "s_main": "Main guest", "s_main_hint": "Please enter the details of the ID document you are travelling with.",
+        "s_guest": "Guest {n}", "s_guest_hint": "For other guests, personal details are enough.",
+        "first_name": "First name", "last_name": "Surname",
+        "sex": "Sex", "sex_m": "Male", "sex_f": "Female",
+        "birth_date": "Date of birth", "birth_country": "Country of birth",
+        "birth_place": "Place of birth (town or city)", "birth_province": "Province (only if born in Italy)",
+        "citizenship": "Citizenship",
+        "doc_type": "Document type", "doc_id": "ID card", "doc_passport": "Passport", "doc_license": "Driving licence",
+        "doc_number": "Document number", "doc_place": "Issued by (town or country)",
+        "doc_front": "Photo of the document (front)", "doc_back": "Photo of the document (back)",
+        "doc_photo": "Photo of the document",
+        "doc_hint": "A sharp photo with all details readable. JPG, PNG or PDF, 10 MB maximum.",
+        "s_other": "Other", "notes": "Notes or requests", "notes_hint": "For example: arriving by car, transfer request.",
+        "privacy_title": "Privacy",
+        "privacy_text": f"Your data is processed by B&amp;B Merì only to register guests as required by Italian law (art. 109 TULPS, reported to the police through the Alloggiati Web portal) and to manage your stay. It is not shared with third parties. Photos of documents are deleted after registration. You can ask to access, correct or delete your data by writing to {EMAIL}.",
+        "consent": "I have read the privacy notice and agree to the processing of my data for registration.",
+        "submit": "Send check-in", "sending": "Sending…",
+        "ok_title": "Check-in complete, thank you!",
+        "ok_email": "We have sent a copy of these instructions to the email address you entered.",
+        "err_title": "We could not send the form.",
+        "err_text": "Please try again shortly or message us on WhatsApp: we will help you straight away.",
+        "err_file": "The file «{name}» is larger than 10 MB: please choose a smaller photo.",
+        "err_dates": "The departure date must be after the arrival date.",
+    },
+
+    # ===================================================== FRANÇAIS =====
+    "fr": {
+        "title": "Check-in en ligne — B&B Merì",
+        "description": "Check-in en ligne pour les hôtes du B&B Merì à Cagliari.",
+        "eyebrow": "Check-in en ligne",
+        "h1": "Bienvenue chez Merì",
+        "intro": "Remplissez ce formulaire avant votre arrivée : cela ne prend que quelques minutes. Ces informations nous servent à enregistrer nos hôtes, comme l'exige la loi italienne. À la fin, vous verrez comment venir et entrer, et vous recevrez aussi les instructions par e-mail.",
+        "required_note": "Les champs marqués * sont obligatoires.",
+        "s_stay": "Votre séjour",
+        "arrival": "Date d'arrivée", "departure": "Date de départ",
+        "guests_count": "Nombre de personnes",
+        "arrival_time": "Heure d'arrivée prévue", "arrival_time_hint": "L'arrivée se fait de 15 h à 20 h.",
+        "booking_ref": "Numéro de réservation", "booking_ref_hint": "Vous le trouverez dans la confirmation Booking.com.",
+        "s_contact": "Coordonnées",
+        "email": "E-mail", "email_hint": "Nous vous enverrons ici la confirmation et les instructions.",
+        "phone": "Téléphone (WhatsApp)",
+        "s_main": "Hôte principal", "s_main_hint": "Indiquez les données de la pièce d'identité avec laquelle vous voyagez.",
+        "s_guest": "Personne {n}", "s_guest_hint": "Pour les accompagnants, l'état civil suffit.",
+        "first_name": "Prénom", "last_name": "Nom",
+        "sex": "Sexe", "sex_m": "Homme", "sex_f": "Femme",
+        "birth_date": "Date de naissance", "birth_country": "Pays de naissance",
+        "birth_place": "Lieu de naissance (commune ou ville)", "birth_province": "Province (seulement si né en Italie)",
+        "citizenship": "Nationalité",
+        "doc_type": "Type de document", "doc_id": "Carte d'identité", "doc_passport": "Passeport", "doc_license": "Permis de conduire",
+        "doc_number": "Numéro du document", "doc_place": "Délivré par (commune ou pays)",
+        "doc_front": "Photo du document (recto)", "doc_back": "Photo du document (verso)",
+        "doc_photo": "Photo du document",
+        "doc_hint": "Photo nette, toutes les informations lisibles. JPG, PNG ou PDF, 10 Mo maximum.",
+        "s_other": "Autre", "notes": "Remarques ou demandes", "notes_hint": "Par exemple : arrivée en voiture, demande de transfert.",
+        "privacy_title": "Confidentialité",
+        "privacy_text": f"Vos données sont traitées par B&amp;B Merì uniquement pour l'enregistrement des hôtes prévu par la loi italienne (art. 109 TULPS, déclaration à la police via le portail Alloggiati Web) et pour la gestion du séjour. Elles ne sont pas transmises à des tiers. Les photos des documents sont supprimées après l'enregistrement. Vous pouvez demander l'accès, la rectification ou la suppression de vos données en écrivant à {EMAIL}.",
+        "consent": "J'ai lu l'information sur la confidentialité et j'accepte le traitement de mes données pour l'enregistrement.",
+        "submit": "Envoyer le check-in", "sending": "Envoi en cours…",
+        "ok_title": "Check-in terminé, merci !",
+        "ok_email": "Nous avons envoyé une copie de ces instructions à l'adresse e-mail indiquée.",
+        "err_title": "Nous n'avons pas pu envoyer le formulaire.",
+        "err_text": "Réessayez dans un instant ou écrivez-nous sur WhatsApp : nous vous aidons tout de suite.",
+        "err_file": "Le fichier « {name} » dépasse 10 Mo : choisissez une photo plus légère.",
+        "err_dates": "La date de départ doit être postérieure à la date d'arrivée.",
+    },
+
+    # ====================================================== ESPAÑOL =====
+    "es": {
+        "title": "Check-in online — B&B Merì",
+        "description": "Check-in online para los huéspedes del B&B Merì en Cagliari.",
+        "eyebrow": "Check-in online",
+        "h1": "Bienvenidos a Merì",
+        "intro": "Rellena este formulario antes de llegar: solo tardarás unos minutos. Necesitamos estos datos para registrar a los huéspedes, como exige la ley italiana. Al final verás cómo llegar y entrar, y también recibirás las instrucciones por e-mail.",
+        "required_note": "Los campos con * son obligatorios.",
+        "s_stay": "Tu estancia",
+        "arrival": "Fecha de llegada", "departure": "Fecha de salida",
+        "guests_count": "Número de huéspedes",
+        "arrival_time": "Hora prevista de llegada", "arrival_time_hint": "El check-in es de 15:00 a 20:00.",
+        "booking_ref": "Número de reserva", "booking_ref_hint": "Lo encontrarás en la confirmación de Booking.com.",
+        "s_contact": "Contacto",
+        "email": "E-mail", "email_hint": "Aquí te enviaremos la confirmación y las instrucciones.",
+        "phone": "Teléfono (WhatsApp)",
+        "s_main": "Huésped principal", "s_main_hint": "Introduce los datos del documento con el que viajas.",
+        "s_guest": "Huésped {n}", "s_guest_hint": "Para los acompañantes bastan los datos personales.",
+        "first_name": "Nombre", "last_name": "Apellidos",
+        "sex": "Sexo", "sex_m": "Hombre", "sex_f": "Mujer",
+        "birth_date": "Fecha de nacimiento", "birth_country": "País de nacimiento",
+        "birth_place": "Lugar de nacimiento (municipio o ciudad)", "birth_province": "Provincia (solo si naciste en Italia)",
+        "citizenship": "Nacionalidad",
+        "doc_type": "Tipo de documento", "doc_id": "Documento de identidad", "doc_passport": "Pasaporte", "doc_license": "Permiso de conducir",
+        "doc_number": "Número del documento", "doc_place": "Expedido en (municipio o país)",
+        "doc_front": "Foto del documento (anverso)", "doc_back": "Foto del documento (reverso)",
+        "doc_photo": "Foto del documento",
+        "doc_hint": "Foto nítida con todos los datos legibles. JPG, PNG o PDF, máximo 10 MB.",
+        "s_other": "Otros", "notes": "Notas o peticiones", "notes_hint": "Por ejemplo: llegada en coche, petición de traslado.",
+        "privacy_title": "Privacidad",
+        "privacy_text": f"B&amp;B Merì trata tus datos solo para el registro de huéspedes exigido por la ley italiana (art. 109 TULPS, comunicación a la policía a través del portal Alloggiati Web) y para gestionar tu estancia. No se ceden a terceros. Las fotos de los documentos se borran tras el registro. Puedes pedir el acceso, la rectificación o la supresión de tus datos escribiendo a {EMAIL}.",
+        "consent": "He leído la información de privacidad y acepto el tratamiento de mis datos para el registro.",
+        "submit": "Enviar el check-in", "sending": "Enviando…",
+        "ok_title": "¡Check-in completado, gracias!",
+        "ok_email": "Te hemos enviado una copia de estas instrucciones al e-mail indicado.",
+        "err_title": "No hemos podido enviar el formulario.",
+        "err_text": "Vuelve a intentarlo en un momento o escríbenos por WhatsApp: te ayudamos enseguida.",
+        "err_file": "El archivo «{name}» supera los 10 MB: elige una foto más ligera.",
+        "err_dates": "La fecha de salida debe ser posterior a la de llegada.",
+    },
+}
+
+MAX_GUESTS = 4
+
+
+def field(label, name, kind="text", required=True, hint=None, options=None,
+          extra="", full=False, default=None):
+    """Un campo del modulo con etichetta, eventuale suggerimento e controllo."""
+    fid = name.replace("][", "-").replace("[", "-").replace("]", "")
+    star = ' <span class="req" aria-hidden="true">*</span>' if required else ""
+    req = " required" if required else ""
+    described = f' aria-describedby="{fid}-hint"' if hint else ""
+    hint_html = f'<small id="{fid}-hint">{hint}</small>' if hint else ""
+    if kind == "select":
+        blank = "" if default is not None else '<option value="" selected disabled></option>'
+        opts = "".join(
+            f'<option value="{attr(v)}"{" selected" if v == default else ""}>{escape(text)}</option>'
+            for v, text in options)
+        control = f'<select id="{fid}" name="{name}"{req}{described}{extra}>{blank}{opts}</select>'
+    elif kind == "textarea":
+        control = f'<textarea id="{fid}" name="{name}" rows="3"{req}{described}{extra}></textarea>'
+    else:
+        control = f'<input id="{fid}" name="{name}" type="{kind}"{req}{described}{extra}>'
+    css = "field field--full" if full else "field"
+    return f'<div class="{css}"><label for="{fid}">{label}{star}</label>{control}{hint_html}</div>'
+
+
+def guest_fields(c, i, main):
+    """Campi di un ospite: `i` e' il numero (0 = principale) o "__i__" nel modello."""
+    g = f"guests[{i}]"
+    files = 'accept="image/*,.pdf"'
+    rows = [
+        field(c["first_name"], f"{g}[first_name]", extra=' autocomplete="given-name"' if main else ""),
+        field(c["last_name"], f"{g}[last_name]", extra=' autocomplete="family-name"' if main else ""),
+        field(c["sex"], f"{g}[sex]", "select", options=[("M", c["sex_m"]), ("F", c["sex_f"])]),
+        field(c["birth_date"], f"{g}[birth_date]", "date"),
+        field(c["birth_country"], f"{g}[birth_country]"),
+        field(c["birth_place"], f"{g}[birth_place]"),
+        field(c["birth_province"], f"{g}[birth_province]", required=False, extra=' maxlength="2"'),
+        field(c["citizenship"], f"{g}[citizenship]"),
+    ]
+    if main:
+        rows += [
+            field(c["doc_type"], f"{g}[doc_type]", "select",
+                  options=[("IDENT", c["doc_id"]), ("PASOR", c["doc_passport"]), ("PATEN", c["doc_license"])]),
+            field(c["doc_number"], f"{g}[doc_number]"),
+            field(c["doc_place"], f"{g}[doc_place]", full=True),
+            field(c["doc_front"], f"{g}[doc_front]", "file", hint=c["doc_hint"], extra=" " + files),
+            field(c["doc_back"], f"{g}[doc_back]", "file", required=False, extra=" " + files),
+        ]
+    else:
+        rows.append(field(c["doc_photo"], f"{g}[doc_photo]", "file", required=False,
+                          hint=c["doc_hint"], extra=" " + files, full=True))
+    return "\n            ".join(rows)
+
+
+def render_checkin(lang):
+    t, c = T[lang], C[lang]
+    folder = CHECKIN_DIR[lang]
+    home = rel(folder, HOME_DIR[lang])
+    whatsapp = f"https://wa.me/{WHATSAPP}?text={quote(t['whatsapp_text'])}"
+    guest_options = [(str(n), str(n)) for n in range(1, MAX_GUESTS + 1)]
+
+    stay = "\n            ".join([
+        field(c["arrival"], "arrival", "date"),
+        field(c["departure"], "departure", "date"),
+        field(c["guests_count"], "guests_count", "select", options=guest_options, default="2"),
+        field(c["arrival_time"], "arrival_time", "time", hint=c["arrival_time_hint"]),
+        field(c["booking_ref"], "booking_ref", required=False, hint=c["booking_ref_hint"], full=True),
+    ])
+    contact = "\n            ".join([
+        field(c["email"], "email", "email", hint=c["email_hint"], extra=' autocomplete="email"'),
+        field(c["phone"], "phone", "tel", extra=' autocomplete="tel"'),
+    ])
+    # Messaggi usati dallo script (errori, invio in corso, titolo ospiti aggiuntivi)
+    messages = json.dumps({k: c[k] for k in ("sending", "err_file", "err_dates", "s_guest")},
+                          ensure_ascii=False)
+
+    return head(lang, folder, CHECKIN_DIR, c["title"], c["description"], "", c["description"], [],
+                extra_meta='\n  <meta name="robots" content="noindex">') \
+        + site_header(lang, folder, "checkin") + f"""
+<main class="checkin-page">
+
+  <section class="page-hero">
+    <div class="container narrow">
+      <a class="back-link" href="{home}">← {P[lang]["back"]}</a>
+      <p class="hero-eyebrow">{c["eyebrow"]}</p>
+      <h1>{c["h1"]}</h1>
+      <p class="hero-sub">{c["intro"]}</p>
+    </div>
+  </section>
+
+  <section class="section section-alt">
+    <div class="container narrow">
+      <form id="checkin-form" class="checkin-form" data-endpoint="{CHECKIN_API}" data-messages="{attr(messages)}" enctype="multipart/form-data" novalidate>
+        <input type="hidden" name="lang" value="{lang}">
+        <div class="hp" aria-hidden="true"><label>Website <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
+        <p class="form-note">{c["required_note"]}</p>
+
+        <fieldset>
+          <legend>{c["s_stay"]}</legend>
+          <div class="field-grid">
+            {stay}
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>{c["s_contact"]}</legend>
+          <div class="field-grid">
+            {contact}
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>{c["s_main"]}</legend>
+          <p class="fieldset-hint">{c["s_main_hint"]}</p>
+          <div class="field-grid">
+            {guest_fields(c, 0, True)}
+          </div>
+        </fieldset>
+
+        <div id="extra-guests"></div>
+
+        <fieldset>
+          <legend>{c["s_other"]}</legend>
+          <div class="field-grid">
+            {field(c["notes"], "notes", "textarea", required=False, hint=c["notes_hint"], full=True)}
+          </div>
+        </fieldset>
+
+        <fieldset class="privacy-box">
+          <legend>{c["privacy_title"]}</legend>
+          <p>{c["privacy_text"]}</p>
+          <label class="consent"><input type="checkbox" name="privacy_consent" value="yes" required> <span>{c["consent"]} <span class="req" aria-hidden="true">*</span></span></label>
+        </fieldset>
+
+        <p class="form-error" id="checkin-error" role="alert" hidden></p>
+        <button type="submit" class="btn btn-primary btn-lg">{c["submit"]}</button>
+      </form>
+
+      <template id="guest-template">
+        <fieldset class="extra-guest">
+          <legend></legend>
+          <p class="fieldset-hint">{c["s_guest_hint"]}</p>
+          <div class="field-grid">
+            {guest_fields(c, "__i__", False)}
+          </div>
+        </fieldset>
+      </template>
+
+      <div id="checkin-result" class="checkin-result" hidden tabindex="-1">
+        <p class="result-icon" aria-hidden="true">✓</p>
+        <h2>{c["ok_title"]}</h2>
+        <div class="checkin-instructions"></div>
+        <p class="result-email">{c["ok_email"]}</p>
+      </div>
+
+      <div id="checkin-failure" class="checkin-failure" hidden tabindex="-1">
+        <h2>{c["err_title"]}</h2>
+        <p>{c["err_text"]}</p>
+        <a class="btn btn-primary" href="{attr(whatsapp)}" target="_blank" rel="noopener">WhatsApp {PHONE_INTL}</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+""" + site_footer(lang, folder, "checkin")
+
+
 # --------------------------------------------------------------- sitemap --
 
 def sitemap():
@@ -1433,9 +1791,12 @@ def sitemap():
 
 
 def main():
+    with_checkin = CHECKIN_FORM_LIVE or os.environ.get("MERI_PREVIEW") == "1"
     for lang in LANGS:
-        for folder, html in ((HOME_DIR[lang], render_home(lang)),
-                             (PARK_DIR[lang], render_parking(lang))):
+        pages = [(HOME_DIR[lang], render_home(lang)), (PARK_DIR[lang], render_parking(lang))]
+        if with_checkin:
+            pages.append((CHECKIN_DIR[lang], render_checkin(lang)))
+        for folder, html in pages:
             path = ROOT / folder / "index.html"
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(html, encoding="utf-8")

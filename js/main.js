@@ -200,3 +200,99 @@
   if (hash.indexOf('spot-') === 0) openSpot(hash.slice(5));
   else activate(panels.some(function (p) { return p.id === hash; }) ? hash : panels[0].id);
 })();
+
+// Check-in online: schede degli accompagnatori in base al numero di ospiti,
+// controlli prima dell'invio, invio al gestionale e istruzioni a schermo.
+(function () {
+  var form = document.getElementById('checkin-form');
+  if (!form) return;
+  var MAX_FILE = 10 * 1024 * 1024;
+  var msg = JSON.parse(form.getAttribute('data-messages'));
+  var template = document.getElementById('guest-template');
+  var extra = document.getElementById('extra-guests');
+  var count = form.querySelector('[name="guests_count"]');
+  var arrival = form.querySelector('[name="arrival"]');
+  var departure = form.querySelector('[name="departure"]');
+  var errorBox = document.getElementById('checkin-error');
+  var button = form.querySelector('button[type="submit"]');
+
+  // Una scheda per ogni ospite oltre al principale (guests[1], guests[2]...)
+  function syncGuests() {
+    var wanted = (parseInt(count.value, 10) || 1) - 1;
+    while (extra.children.length < wanted) {
+      var i = extra.children.length + 1;
+      var node = template.content.firstElementChild.cloneNode(true);
+      node.querySelector('legend').textContent = msg.s_guest.replace('{n}', i + 1);
+      node.querySelectorAll('[name], [id], [for], [aria-describedby]').forEach(function (el) {
+        ['name', 'id', 'for', 'aria-describedby'].forEach(function (a) {
+          if (el.hasAttribute(a)) el.setAttribute(a, el.getAttribute(a).replace(/__i__/g, i));
+        });
+      });
+      extra.appendChild(node);
+    }
+    while (extra.children.length > wanted) extra.removeChild(extra.lastElementChild);
+  }
+  count.addEventListener('change', syncGuests);
+  syncGuests();
+
+  // La partenza non puo' essere prima dell'arrivo
+  arrival.addEventListener('change', function () { departure.min = arrival.value; });
+
+  function fail(text, field) {
+    errorBox.textContent = text;
+    errorBox.hidden = false;
+    if (field) field.focus();
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    errorBox.hidden = true;
+    if (!form.checkValidity()) { form.reportValidity(); return; }
+    if (departure.value <= arrival.value) return fail(msg.err_dates, departure);
+    var files = form.querySelectorAll('input[type="file"]');
+    for (var k = 0; k < files.length; k++) {
+      var f = files[k].files[0];
+      if (f && f.size > MAX_FILE) return fail(msg.err_file.replace('{name}', f.name), files[k]);
+    }
+
+    var label = button.textContent;
+    button.disabled = true;
+    button.textContent = msg.sending;
+
+    fetch(form.getAttribute('data-endpoint'), { method: 'POST', body: new FormData(form) })
+      .then(function (res) {
+        return res.json().then(function (data) {
+          if (!res.ok || !data.ok) throw new Error(data.error || res.status);
+          return data;
+        });
+      })
+      .then(showResult)
+      .catch(function () {
+        button.disabled = false;
+        button.textContent = label;
+        var box = document.getElementById('checkin-failure');
+        box.hidden = false;
+        box.focus();
+        box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+  });
+
+  // Le istruzioni arrivano dal gestionale come testo semplice: un paragrafo
+  // ogni riga vuota. Inserite come testo, mai come HTML.
+  function showResult(data) {
+    var box = document.getElementById('checkin-result');
+    var target = box.querySelector('.checkin-instructions');
+    target.textContent = '';
+    String(data.instructions || '').split(/\n\s*\n/).forEach(function (part) {
+      if (!part.trim()) return;
+      var p = document.createElement('p');
+      p.textContent = part.trim();
+      target.appendChild(p);
+    });
+    form.hidden = true;
+    document.getElementById('checkin-failure').hidden = true;
+    box.hidden = false;
+    box.focus();
+    box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+})();
