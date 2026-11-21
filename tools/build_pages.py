@@ -1,23 +1,34 @@
 #!/usr/bin/env python3
-"""Genera la home del sito B&B Merì in quattro lingue (IT, EN, FR, ES).
+"""Genera il sito B&B Merì in quattro lingue (IT, EN, FR, ES).
 
-Tutti i testi stanno nel dizionario T qui sotto, una sezione per lingua.
+Tutti i testi stanno nei dizionari qui sotto (T = home, P = parcheggi,
+G = guida "cosa vedere", C = check-in), una sezione per lingua.
 Per cambiare qualcosa: modifica i testi e rilancia
 
     python3 tools/build_pages.py
 
-Lo script riscrive la home (index.html, en/, fr/, es/), la guida ai
-parcheggi (parcheggi/, en/parking/, fr/stationnement/, es/aparcamiento/)
-e sitemap.xml, cosi' le quattro lingue restano sempre allineate.
+Lo script riscrive:
+  - le home (index.html, en/, fr/, es/)
+  - la guida ai parcheggi (parcheggi/, en/parking/, fr/stationnement/, es/aparcamiento/)
+  - la guida "cosa vedere a Castello" (cosa-vedere-a-castello/, en/..., fr/..., es/...)
+  - sitemap.xml (con le foto e la data di ultima modifica di ogni pagina)
+  - llms.txt (il riassunto per gli assistenti AI, con gli stessi dati delle pagine)
+  - le versioni ottimizzate delle foto (WebP) e la copertina per i social (serve Pillow)
+cosi' le quattro lingue, i dati strutturati e llms.txt restano sempre allineati.
+
+Su GitHub lo script parte da solo a ogni modifica (.github/workflows/aggiorna-sito.yml).
 """
+import datetime
 import hashlib
 import os
 import json
 import posixpath
 import re
+import struct
 from html import escape, unescape
 from pathlib import Path
 from urllib.parse import quote, quote_plus
+from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -39,9 +50,46 @@ CHECKIN_FORM_LIVE = False
 CHECKIN_API = "https://gestionale.meribnb.it/api/checkin"
 STREET = "Via Alberto Lamarmora 18"
 MAPS_URL = "https://www.google.com/maps/search/?api=1&query=Via+Alberto+Lamarmora+18%2C+Cagliari"
-LASTMOD = "2026-10-29"
+# Coordinate del portone, usate nei dati strutturati. Sono una STIMA da
+# verificare: su Google Maps tasto destro sul portone -> clic sui numeri
+# (es. 39.21830, 9.11640) per copiarli, poi incollali qui.
+GEO = (39.2183, 9.1164)
+
+# ---------------------------------------------- motori di ricerca e AI --
+# Codici di verifica (facoltativi). Google Search Console -> metodo "Tag HTML":
+# copia solo il valore tra le virgolette di content="...". Bing Webmaster
+# Tools -> "Meta tag" msvalidate.01, idem. Vuoti = nessun tag nella pagina.
+GOOGLE_SITE_VERIFICATION = ""
+BING_SITE_VERIFICATION = ""
+
+# Profili ufficiali della struttura su altri siti: scheda Google Maps,
+# Booking.com, Airbnb, TripAdvisor, Instagram, Facebook... Dicono a Google e
+# agli assistenti AI che sono tutti la stessa struttura. Uno per riga, tra
+# virgolette e con la virgola finale, per esempio:
+#   SAME_AS = [
+#       "https://www.booking.com/hotel/it/nome-della-struttura.html",
+#       "https://www.instagram.com/nomeprofilo/",
+#   ]
+SAME_AS = []
+
+# Chiave IndexNow: serve ad avvisare Bing (che alimenta anche ChatGPT,
+# Copilot e DuckDuckGo) e Yandex quando una pagina cambia. Lo script scrive il
+# file <chiave>.txt nella cartella principale del sito; l'avviso lo manda
+# tools/indexnow.py, lanciato in automatico da GitHub.
+INDEXNOW_KEY = "ac72737aca2d53c2b5fee6041e87b117"
+
+# Mese in cui sono state verificate le tariffe dei parcheggi (vedi SOURCES).
+# Il controllo mensile automatico avvisa quando hanno piu' di 6 mesi.
+PARKING_CHECKED = "2026-10"
+
+# Data di pubblicazione della guida "cosa vedere a Castello" (resta fissa)
+GUIDE_PUBLISHED = "2026-11-22"
 
 LANGS = ["it", "en", "fr", "es"]
+try:
+    TZ = ZoneInfo("Europe/Rome")
+except Exception:   # Windows senza il pacchetto tzdata: ora italiana invernale
+    TZ = datetime.timezone(datetime.timedelta(hours=1))
 
 
 # ---------------------------------------------------------------- testi --
@@ -52,14 +100,29 @@ T = {
         "lang_name": "Italiano",
         "og_locale": "it_IT",
         "region": "Sardegna",
-        "title": "B&B Merì — Bed & Breakfast nel centro storico di Cagliari",
-        "description": "B&B Merì: camera matrimoniale con bagno privato nel cuore di Castello, il centro storico di Cagliari. Wi-Fi, aria condizionata, acqua potabile dal rubinetto e transfer su richiesta. A pochi passi dal Bastione di Saint Remy.",
-        "keywords": "b&b cagliari centro, bed and breakfast cagliari, camera con bagno privato cagliari, dormire a cagliari castello, alloggio centro storico cagliari, b&b merì cagliari",
+        "title": "B&B Merì — B&B a Castello, nel centro storico di Cagliari",
+        "description": "Camera matrimoniale con bagno privato nel quartiere Castello di Cagliari, a 3 minuti dal Bastione di Saint Remy. Wi-Fi e aria condizionata. −10% prenotando per telefono.",
         "og_description": "Camere con bagno privato nel quartiere Castello, centro storico di Cagliari. A pochi passi dal Bastione di Saint Remy.",
         "ids": {"rooms": "stanze", "amenities": "servizi", "location": "posizione",
                 "arrival": "come-arrivare", "faq": "faq", "contact": "contatti"},
         "nav": {"rooms": "Le Stanze", "amenities": "Servizi", "location": "Posizione", "parking": "Parcheggi",
-                "arrival": "Come arrivare", "faq": "FAQ", "book": "Prenota"},
+                "guide": "Cosa vedere", "arrival": "Come arrivare", "faq": "FAQ", "book": "Prenota"},
+        "home_crumb": "B&B Merì",
+        "gallery_label": "Foto della Camera Matrimoniale",
+        "photo_word": "foto",
+        "facts_title": "In breve",
+        "facts": [
+            ("Dove", "Via Alberto Lamarmora 18, 09124 Cagliari — quartiere Castello, centro storico"),
+            ("Camere", "Camera Matrimoniale con bagno privato, fino a 2 ospiti (la Camera con Cucina al momento non è disponibile)"),
+            ("Check-in", "dalle 15:00 alle 20:00, anche online prima dell'arrivo"),
+            ("Check-out", "entro le 10:30"),
+            ("Colazione", "non inclusa"),
+            ("Servizi", "Wi-Fi gratuito, aria condizionata e riscaldamento, acqua potabile dal rubinetto, transfer su richiesta"),
+            ("Animali", "non ammessi"),
+            ("Prenotazioni", f"dirette per telefono o WhatsApp al {PHONE_INTL} o via email; prenotando per telefono, 10% di sconto rispetto a Booking"),
+            ("Codice CIN", CIN),
+        ],
+        "guide_link": "Cosa vedere a piedi da qui: il nostro itinerario di Castello →",
         "nav_label": "Navigazione principale",
         "menu_open": "Apri menu",
         "hero_eyebrow": "Bed &amp; Breakfast · Castello, Cagliari",
@@ -134,10 +197,15 @@ T = {
         "faq": [
             ("Come arrivo dall'aeroporto?", "In treno da Elmas Aeroporto alla stazione di Cagliari in Piazza Matteotti (circa 10 minuti), poi bus CTM linea 7, che ferma proprio davanti a casa."),
             ("Castello è ZTL? Dove parcheggio?", "Sì, Castello è zona a traffico limitato: non entrate in auto nel quartiere. Il parcheggio gratuito più vicino è in Viale Buoncammino; a pagamento ci sono le aree e il multipiano di Viale Regina Elena, collegati a Castello da ascensori pubblici. Tutti i dettagli, con mappe e tariffe, sono nella nostra guida ai parcheggi: https://www.meribnb.it/parcheggi/"),
+            ("A che ora sono il check-in e il check-out?", "Il check-in è dalle 15:00 alle 20:00; per orari diversi basta avvisarci. Il check-out è entro le 10:30. Potete fare il check-in online in anticipo dal pulsante in cima alla pagina."),
+            ("La colazione è inclusa?", "No, la colazione non è inclusa nel prezzo. Nei dintorni ci sono bar e caffè dove fare colazione, a pochi minuti a piedi."),
+            ("Come si prenota? C'è uno sconto prenotando direttamente?", f"Sì: prenotando per telefono al {PHONE} avete il 10% di sconto rispetto alla tariffa di Booking. Potete scriverci anche su WhatsApp allo stesso numero o via email a {EMAIL}: rispondiamo in giornata."),
+            ("Le camere hanno il bagno privato?", "Sì, ogni camera ha il bagno privato con doccia, asciugacapelli e set di cortesia."),
+            ("Quante persone può ospitare la camera?", "La Camera Matrimoniale ospita fino a 2 persone, con un letto matrimoniale. La Camera con Cucina al momento non è disponibile."),
+            ("Ci sono Wi-Fi e aria condizionata?", "Sì: il Wi-Fi è gratuito e veloce in tutta la struttura, e ogni camera ha aria condizionata e riscaldamento autonomi."),
             ("Il transfer è disponibile?", "Sì, su richiesta: scriveteci in anticipo per organizzarlo."),
             ("L'acqua del rubinetto è potabile?", "Sì, l'acqua del rubinetto è potabile: fresca e buona da bere."),
-            ("A che ora sono il check-in e il check-out?", "Il check-in è dalle 15:00 alle 20:00; per orari diversi basta avvisarci. Il check-out è entro le 10:30. Potete fare il check-in online in anticipo dal pulsante in cima alla pagina."),
-            ("Le camere hanno il bagno privato?", "Sì, ogni camera ha il bagno privato con doccia, asciugacapelli e set di cortesia."),
+            ("Cosa c'è da vedere vicino al B&B?", "Siete nel cuore di Castello: la Cattedrale è a 2 minuti a piedi, il Bastione di Saint Remy a 3 e la Torre dell'Elefante a 4. Trovate l'itinerario completo a piedi, con tempi e mappe, nella nostra guida: https://www.meribnb.it/cosa-vedere-a-castello/"),
             ("Quanto dista la spiaggia?", "La spiaggia del Poetto, 8 km di sabbia bianca, dista circa 6 km: 15 minuti in bus o 10 in auto."),
             ("Sono ammessi animali?", "Al momento non possiamo accogliere animali domestici."),
         ],
@@ -157,8 +225,9 @@ T = {
                          "Posizione in centro storico"],
         "ld_rooms": [
             ("Camera Matrimoniale", "Camera matrimoniale con bagno privato e aria condizionata, nel quartiere Castello.", ["Bagno privato", "Aria condizionata"]),
-            ("Camera con Cucina", "Camera matrimoniale con angolo cottura e bagno privato, nel quartiere Castello.", ["Bagno privato", "Angolo cottura"]),
+            ("Camera con Cucina", "Camera matrimoniale con angolo cottura e bagno privato, nel quartiere Castello. Attualmente non disponibile.", ["Bagno privato", "Angolo cottura"]),
         ],
+        "ld_bed": "Letto matrimoniale",
     },
 
     # ====================================================== ENGLISH =====
@@ -166,14 +235,29 @@ T = {
         "lang_name": "English",
         "og_locale": "en_GB",
         "region": "Sardinia",
-        "title": "B&B Merì — Bed & Breakfast in the historic centre of Cagliari",
-        "description": "B&B Merì: double room with private bathroom in the heart of Castello, Cagliari's historic centre. Free Wi-Fi, air conditioning, drinkable tap water and transfer on request. Steps from the Bastione di Saint Remy.",
-        "keywords": "b&b cagliari centre, bed and breakfast cagliari, room with private bathroom cagliari, where to stay cagliari castello, accommodation cagliari old town, b&b merì cagliari",
+        "title": "B&B Merì — B&B in Castello, Cagliari's historic centre",
+        "description": "Double room with private bathroom in Cagliari's Castello quarter, a 3-minute walk from the Bastione di Saint Remy. Free Wi-Fi, A/C. 10% off when you book by phone.",
         "og_description": "Rooms with private bathroom in the Castello district, Cagliari's historic centre. Steps from the Bastione di Saint Remy.",
         "ids": {"rooms": "rooms", "amenities": "amenities", "location": "location",
                 "arrival": "getting-here", "faq": "faq", "contact": "contact"},
         "nav": {"rooms": "Rooms", "amenities": "Amenities", "location": "Location", "parking": "Parking",
-                "arrival": "Getting here", "faq": "FAQ", "book": "Book"},
+                "guide": "Things to see", "arrival": "Getting here", "faq": "FAQ", "book": "Book"},
+        "home_crumb": "B&B Merì",
+        "gallery_label": "Photos of the Double Room",
+        "photo_word": "photo",
+        "facts_title": "At a glance",
+        "facts": [
+            ("Where", "Via Alberto Lamarmora 18, 09124 Cagliari — Castello district, historic centre"),
+            ("Rooms", "Double Room with private bathroom, up to 2 guests (the Room with Kitchenette is currently unavailable)"),
+            ("Check-in", "3:00 PM to 8:00 PM, also online before you arrive"),
+            ("Check-out", "by 10:30 AM"),
+            ("Breakfast", "not included"),
+            ("Amenities", "free Wi-Fi, air conditioning and heating, drinkable tap water, transfer on request"),
+            ("Pets", "not allowed"),
+            ("Bookings", f"direct by phone or WhatsApp on {PHONE_INTL} or by email; book by phone for 10% off the Booking.com rate"),
+            ("CIN code", CIN),
+        ],
+        "guide_link": "Things to see on foot from here: our Castello walking tour →",
         "nav_label": "Main navigation",
         "menu_open": "Open menu",
         "hero_eyebrow": "Bed &amp; Breakfast · Castello, Cagliari",
@@ -248,10 +332,15 @@ T = {
         "faq": [
             ("How do I get there from the airport?", "By train from Elmas Aeroporto to Cagliari station in Piazza Matteotti (about 10 minutes), then CTM bus line 7, which stops right outside our door."),
             ("Is Castello a ZTL? Where can I park?", "Yes, Castello is a limited-traffic zone: please don't drive into the quarter. The nearest free parking is on Viale Buoncammino; paid options are the street areas and the multi-storey car park on Viale Regina Elena, linked to Castello by public lifts. All the details, with maps and prices, are in our parking guide: https://www.meribnb.it/en/parking/"),
+            ("What are the check-in and check-out times?", "Check-in is from 3:00 PM to 8:00 PM; just let us know if you need a different time. Check-out is by 10:30 AM. You can complete online check-in in advance using the button at the top of the page."),
+            ("Is breakfast included?", "No, breakfast is not included in the price. There are bars and cafés for breakfast a few minutes' walk away."),
+            ("How do I book? Is there a discount for booking direct?", f"Yes: book by phone on {PHONE_INTL} and you get 10% off the Booking.com rate. You can also message us on WhatsApp at the same number or email us at {EMAIL}: we reply within the day."),
+            ("Do the rooms have a private bathroom?", "Yes, every room has a private bathroom with shower, hairdryer and toiletries."),
+            ("How many guests can the room sleep?", "The Double Room sleeps up to 2 guests in a double bed. The Room with Kitchenette is currently unavailable."),
+            ("Is there Wi-Fi and air conditioning?", "Yes: free, fast Wi-Fi throughout the property, and every room has its own air conditioning and heating."),
             ("Is a transfer available?", "Yes, on request: write to us in advance to arrange it."),
             ("Is the tap water drinkable?", "Yes, the tap water is drinkable: fresh and good to drink."),
-            ("What are the check-in and check-out times?", "Check-in is from 3:00 PM to 8:00 PM; just let us know if you need a different time. Check-out is by 10:30 AM. You can complete online check-in in advance using the button at the top of the page."),
-            ("Do the rooms have a private bathroom?", "Yes, every room has a private bathroom with shower, hairdryer and toiletries."),
+            ("What is there to see near the B&B?", "You're in the heart of Castello: the Cathedral is a 2-minute walk away, the Bastione di Saint Remy 3 minutes and the Elephant Tower 4. Our guide has the full walking tour, with times and maps: https://www.meribnb.it/en/things-to-see-in-castello/"),
             ("How far is the beach?", "Poetto beach, 8 km of white sand, is about 6 km away: 15 minutes by bus or 10 by car."),
             ("Are pets allowed?", "Unfortunately we cannot accommodate pets at the moment."),
         ],
@@ -271,8 +360,9 @@ T = {
                          "Historic centre location"],
         "ld_rooms": [
             ("Double Room", "Double room with private bathroom and air conditioning, in the Castello district.", ["Private bathroom", "Air conditioning"]),
-            ("Room with Kitchenette", "Double room with kitchenette and private bathroom, in the Castello district.", ["Private bathroom", "Kitchenette"]),
+            ("Room with Kitchenette", "Double room with kitchenette and private bathroom, in the Castello district. Currently unavailable.", ["Private bathroom", "Kitchenette"]),
         ],
+        "ld_bed": "Double bed",
     },
 
     # ===================================================== FRANÇAIS =====
@@ -280,14 +370,29 @@ T = {
         "lang_name": "Français",
         "og_locale": "fr_FR",
         "region": "Sardaigne",
-        "title": "B&B Merì — Chambres d'hôtes dans le centre historique de Cagliari",
-        "description": "B&B Merì : chambre double avec salle de bains privative au cœur de Castello, le centre historique de Cagliari. Wi-Fi gratuit, climatisation, eau du robinet potable et transfert sur demande. À deux pas du Bastion de Saint-Remy.",
-        "keywords": "b&b cagliari centre, chambre d'hôtes cagliari, chambre avec salle de bains privative cagliari, où dormir à cagliari castello, logement centre historique cagliari, b&b merì cagliari",
+        "title": "B&B Merì — Chambre d'hôtes à Castello, Cagliari",
+        "description": "Chambre double avec salle de bains privative dans le quartier de Castello à Cagliari, à 3 min du Bastion de Saint-Remy. Wi-Fi, clim. −10 % en réservant par téléphone.",
         "og_description": "Chambres avec salle de bains privative dans le quartier de Castello, centre historique de Cagliari. À deux pas du Bastion de Saint-Remy.",
         "ids": {"rooms": "chambres", "amenities": "services", "location": "emplacement",
                 "arrival": "acces", "faq": "faq", "contact": "contact"},
         "nav": {"rooms": "Chambres", "amenities": "Services", "location": "Emplacement", "parking": "Parkings",
-                "arrival": "Accès", "faq": "FAQ", "book": "Réserver"},
+                "guide": "À voir", "arrival": "Accès", "faq": "FAQ", "book": "Réserver"},
+        "home_crumb": "B&B Merì",
+        "gallery_label": "Photos de la chambre double",
+        "photo_word": "photo",
+        "facts_title": "En bref",
+        "facts": [
+            ("Adresse", "Via Alberto Lamarmora 18, 09124 Cagliari — quartier de Castello, centre historique"),
+            ("Chambres", "Chambre double avec salle de bains privative, jusqu'à 2 personnes (la chambre avec kitchenette est actuellement indisponible)"),
+            ("Arrivée", "de 15 h à 20 h, check-in possible en ligne avant l'arrivée"),
+            ("Départ", "avant 10 h 30"),
+            ("Petit-déjeuner", "non inclus"),
+            ("Services", "Wi-Fi gratuit, climatisation et chauffage, eau du robinet potable, transfert sur demande"),
+            ("Animaux", "non acceptés"),
+            ("Réservations", f"en direct par téléphone ou WhatsApp au {PHONE_INTL} ou par e-mail ; en réservant par téléphone, −10 % par rapport au tarif Booking"),
+            ("Code CIN", CIN),
+        ],
+        "guide_link": "À voir à pied depuis ici : notre itinéraire dans Castello →",
         "nav_label": "Navigation principale",
         "menu_open": "Ouvrir le menu",
         "hero_eyebrow": "Chambres d'hôtes · Castello, Cagliari",
@@ -362,10 +467,15 @@ T = {
         "faq": [
             ("Comment venir depuis l'aéroport ?", "En train d'Elmas Aeroporto à la gare de Cagliari, Piazza Matteotti (10 minutes environ), puis bus CTM ligne 7, qui s'arrête juste devant chez nous."),
             ("Castello est-il en ZTL ? Où se garer ?", "Oui, Castello est une zone à trafic limité : n'entrez pas en voiture dans le quartier. Le parking gratuit le plus proche se trouve sur le Viale Buoncammino ; côté payant, il y a les zones et le parking à étages du Viale Regina Elena, reliés à Castello par des ascenseurs publics. Tous les détails, avec cartes et tarifs, sont dans notre guide du stationnement : https://www.meribnb.it/fr/stationnement/"),
+            ("Quels sont les horaires d'arrivée et de départ ?", "L'arrivée se fait de 15 h à 20 h ; pour un autre horaire, prévenez-nous. Le départ se fait avant 10 h 30. Vous pouvez faire le check-in en ligne à l'avance grâce au bouton en haut de la page."),
+            ("Le petit-déjeuner est-il inclus ?", "Non, le petit-déjeuner n'est pas inclus dans le prix. Il y a des bars et des cafés pour le petit-déjeuner à quelques minutes à pied."),
+            ("Comment réserver ? Y a-t-il une remise en réservant en direct ?", f"Oui : en réservant par téléphone au {PHONE_INTL}, vous bénéficiez de 10 % de remise par rapport au tarif Booking. Vous pouvez aussi nous écrire sur WhatsApp au même numéro ou par e-mail à {EMAIL} : nous répondons dans la journée."),
+            ("Les chambres ont-elles une salle de bains privative ?", "Oui, chaque chambre dispose d'une salle de bains privative avec douche, sèche-cheveux et produits d'accueil."),
+            ("Combien de personnes peut accueillir la chambre ?", "La chambre double accueille jusqu'à 2 personnes, avec un lit double. La chambre avec kitchenette est actuellement indisponible."),
+            ("Y a-t-il le Wi-Fi et la climatisation ?", "Oui : Wi-Fi gratuit et rapide dans toute la maison, et chaque chambre a sa climatisation et son chauffage individuels."),
             ("Un transfert est-il possible ?", "Oui, sur demande : écrivez-nous à l'avance pour l'organiser."),
             ("L'eau du robinet est-elle potable ?", "Oui, l'eau du robinet est potable : fraîche et bonne à boire."),
-            ("Quels sont les horaires d'arrivée et de départ ?", "L'arrivée se fait de 15 h à 20 h ; pour un autre horaire, prévenez-nous. Le départ se fait avant 10 h 30. Vous pouvez faire le check-in en ligne à l'avance grâce au bouton en haut de la page."),
-            ("Les chambres ont-elles une salle de bains privative ?", "Oui, chaque chambre dispose d'une salle de bains privative avec douche, sèche-cheveux et produits d'accueil."),
+            ("Que voir près du B&B ?", "Vous êtes au cœur de Castello : la cathédrale est à 2 minutes à pied, le Bastion de Saint-Remy à 3 et la Tour de l'Éléphant à 4. Notre guide propose l'itinéraire complet à pied, avec temps de marche et cartes : https://www.meribnb.it/fr/que-voir-a-castello/"),
             ("À quelle distance est la plage ?", "La plage du Poetto, 8 km de sable blanc, est à environ 6 km : 15 minutes en bus ou 10 en voiture."),
             ("Les animaux sont-ils acceptés ?", "Pour le moment, nous ne pouvons malheureusement pas accueillir d'animaux."),
         ],
@@ -384,8 +494,9 @@ T = {
                          "Eau du robinet potable", "Transfert sur demande", "Centre historique"],
         "ld_rooms": [
             ("Chambre double", "Chambre double avec salle de bains privative et climatisation, dans le quartier de Castello.", ["Salle de bains privative", "Climatisation"]),
-            ("Chambre avec kitchenette", "Chambre double avec kitchenette et salle de bains privative, dans le quartier de Castello.", ["Salle de bains privative", "Kitchenette"]),
+            ("Chambre avec kitchenette", "Chambre double avec kitchenette et salle de bains privative, dans le quartier de Castello. Actuellement indisponible.", ["Salle de bains privative", "Kitchenette"]),
         ],
+        "ld_bed": "Lit double",
     },
 
     # ====================================================== ESPAÑOL =====
@@ -393,14 +504,29 @@ T = {
         "lang_name": "Español",
         "og_locale": "es_ES",
         "region": "Cerdeña",
-        "title": "B&B Merì — Bed & Breakfast en el centro histórico de Cagliari",
-        "description": "B&B Merì: habitación doble con baño privado en el corazón de Castello, el centro histórico de Cagliari. Wi-Fi gratis, aire acondicionado, agua potable del grifo y traslado bajo petición. A pocos pasos del Bastión de Saint Remy.",
-        "keywords": "b&b cagliari centro, bed and breakfast cagliari, habitación con baño privado cagliari, dónde dormir en cagliari castello, alojamiento centro histórico cagliari, b&b merì cagliari",
+        "title": "B&B Merì — B&B en Castello, centro histórico de Cagliari",
+        "description": "Habitación doble con baño privado en el barrio de Castello de Cagliari, a 3 min del Bastión de Saint Remy. Wi-Fi, aire acondicionado. −10 % reservando por teléfono.",
         "og_description": "Habitaciones con baño privado en el barrio de Castello, centro histórico de Cagliari. A pocos pasos del Bastión de Saint Remy.",
         "ids": {"rooms": "habitaciones", "amenities": "servicios", "location": "ubicacion",
                 "arrival": "como-llegar", "faq": "faq", "contact": "contacto"},
         "nav": {"rooms": "Habitaciones", "amenities": "Servicios", "location": "Ubicación", "parking": "Aparcar",
-                "arrival": "Cómo llegar", "faq": "FAQ", "book": "Reservar"},
+                "guide": "Qué ver", "arrival": "Cómo llegar", "faq": "FAQ", "book": "Reservar"},
+        "home_crumb": "B&B Merì",
+        "gallery_label": "Fotos de la habitación doble",
+        "photo_word": "foto",
+        "facts_title": "En resumen",
+        "facts": [
+            ("Dónde", "Via Alberto Lamarmora 18, 09124 Cagliari — barrio de Castello, centro histórico"),
+            ("Habitaciones", "Habitación doble con baño privado, hasta 2 huéspedes (la habitación con cocina no está disponible por ahora)"),
+            ("Check-in", "de 15:00 a 20:00, también online antes de llegar"),
+            ("Check-out", "antes de las 10:30"),
+            ("Desayuno", "no incluido"),
+            ("Servicios", "Wi-Fi gratis, aire acondicionado y calefacción, agua potable del grifo, traslado bajo petición"),
+            ("Animales", "no admitidos"),
+            ("Reservas", f"directas por teléfono o WhatsApp al {PHONE_INTL} o por e-mail; reservando por teléfono, 10 % de descuento sobre la tarifa de Booking"),
+            ("Código CIN", CIN),
+        ],
+        "guide_link": "Qué ver a pie desde aquí: nuestro itinerario por Castello →",
         "nav_label": "Navegación principal",
         "menu_open": "Abrir menú",
         "hero_eyebrow": "Bed &amp; Breakfast · Castello, Cagliari",
@@ -475,10 +601,15 @@ T = {
         "faq": [
             ("¿Cómo llego desde el aeropuerto?", "En tren desde Elmas Aeroporto hasta la estación de Cagliari en Piazza Matteotti (unos 10 minutos) y después el autobús CTM línea 7, que para justo delante de casa."),
             ("¿Castello es ZTL? ¿Dónde aparco?", "Sí, Castello es zona de tráfico limitado: no entres en coche en el barrio. El aparcamiento gratuito más cercano está en el Viale Buoncammino; de pago están las zonas y el aparcamiento de varias plantas del Viale Regina Elena, conectados con Castello por ascensores públicos. Todos los detalles, con mapas y tarifas, están en nuestra guía de aparcamiento: https://www.meribnb.it/es/aparcamiento/"),
+            ("¿A qué hora son el check-in y el check-out?", "El check-in es de 15:00 a 20:00; si necesitas otro horario, avísanos. El check-out es antes de las 10:30. Puedes hacer el check-in online con antelación desde el botón de arriba de la página."),
+            ("¿El desayuno está incluido?", "No, el desayuno no está incluido en el precio. Cerca hay bares y cafeterías para desayunar, a pocos minutos a pie."),
+            ("¿Cómo se reserva? ¿Hay descuento reservando directamente?", f"Sí: reservando por teléfono al {PHONE_INTL} tienes un 10 % de descuento sobre la tarifa de Booking. También puedes escribirnos por WhatsApp al mismo número o por e-mail a {EMAIL}: respondemos en el día."),
+            ("¿Las habitaciones tienen baño privado?", "Sí, cada habitación tiene baño privado con ducha, secador de pelo y artículos de aseo."),
+            ("¿Cuántas personas caben en la habitación?", "La habitación doble aloja hasta 2 personas, con una cama de matrimonio. La habitación con cocina no está disponible por ahora."),
+            ("¿Hay Wi-Fi y aire acondicionado?", "Sí: Wi-Fi gratis y rápido en todo el alojamiento, y cada habitación tiene aire acondicionado y calefacción independientes."),
             ("¿Hay servicio de traslado?", "Sí, bajo petición: escríbenos con antelación para organizarlo."),
             ("¿El agua del grifo es potable?", "Sí, el agua del grifo es potable: fresca y buena para beber."),
-            ("¿A qué hora son el check-in y el check-out?", "El check-in es de 15:00 a 20:00; si necesitas otro horario, avísanos. El check-out es antes de las 10:30. Puedes hacer el check-in online con antelación desde el botón de arriba de la página."),
-            ("¿Las habitaciones tienen baño privado?", "Sí, cada habitación tiene baño privado con ducha, secador de pelo y artículos de aseo."),
+            ("¿Qué se puede ver cerca del B&B?", "Estás en el corazón de Castello: la catedral está a 2 minutos a pie, el Bastión de Saint Remy a 3 y la Torre del Elefante a 4. En nuestra guía tienes el itinerario completo a pie, con tiempos y mapas: https://www.meribnb.it/es/que-ver-en-castello/"),
             ("¿A qué distancia está la playa?", "La playa del Poetto, 8 km de arena blanca, está a unos 6 km: 15 minutos en autobús o 10 en coche."),
             ("¿Se admiten animales?", "Por el momento, lamentablemente no podemos alojar animales."),
         ],
@@ -497,8 +628,9 @@ T = {
                          "Agua potable del grifo", "Traslado bajo petición", "Centro histórico"],
         "ld_rooms": [
             ("Habitación doble", "Habitación doble con baño privado y aire acondicionado, en el barrio de Castello.", ["Baño privado", "Aire acondicionado"]),
-            ("Habitación con cocina", "Habitación doble con cocina equipada y baño privado, en el barrio de Castello.", ["Baño privado", "Cocina"]),
+            ("Habitación con cocina", "Habitación doble con cocina equipada y baño privado, en el barrio de Castello. No disponible por ahora.", ["Baño privado", "Cocina"]),
         ],
+        "ld_bed": "Cama de matrimonio",
     },
 }
 
@@ -512,8 +644,10 @@ T = {
 # Dove si trova la pagina parcheggi in ogni lingua (cartella del sito)
 HOME_DIR = {"it": "", "en": "en", "fr": "fr", "es": "es"}
 PARK_DIR = {"it": "parcheggi", "en": "en/parking", "fr": "fr/stationnement", "es": "es/aparcamiento"}
+GUIDE_DIR = {"it": "cosa-vedere-a-castello", "en": "en/things-to-see-in-castello",
+             "fr": "fr/que-voir-a-castello", "es": "es/que-ver-en-castello"}
 CHECKIN_DIR = {"it": "checkin", "en": "en/check-in", "fr": "fr/check-in", "es": "es/check-in"}
-PAGE_DIRS = {"home": HOME_DIR, "parking": PARK_DIR, "checkin": CHECKIN_DIR}
+PAGE_DIRS = {"home": HOME_DIR, "parking": PARK_DIR, "guide": GUIDE_DIR, "checkin": CHECKIN_DIR}
 
 # Destinazione del percorso a piedi su Google Maps
 DEST = "Via Alberto Lamarmora 18, 09124 Cagliari"
@@ -546,8 +680,7 @@ P = {
     # ===================================================== ITALIANO =====
     "it": {
         "title": "Dove parcheggiare a Cagliari vicino a Castello — B&B Merì",
-        "description": "Guida ai parcheggi vicino al quartiere Castello di Cagliari: parcheggio gratuito in Viale Buoncammino, aree a pagamento e multipiano in Viale Regina Elena, ascensori pubblici, ZTL, tariffe e mappe.",
-        "keywords": "parcheggio castello cagliari, dove parcheggiare cagliari, parcheggio gratuito cagliari centro, viale buoncammino parcheggio, parcheggio regina elena cagliari, ztl castello cagliari",
+        "description": "Dove parcheggiare vicino a Castello, a Cagliari: gratis in Viale Buoncammino, aree e multipiano in Viale Regina Elena, ascensori pubblici, ZTL. Tariffe e mappe.",
         "og_description": "Parcheggi gratuiti e a pagamento vicino a Castello, ascensori, ZTL e mappe: la guida del B&B Merì.",
         "back": "Torna alla home",
         "eyebrow": "Guida ai parcheggi · Castello, Cagliari",
@@ -615,8 +748,7 @@ P = {
     # ====================================================== ENGLISH =====
     "en": {
         "title": "Where to park in Cagliari near Castello — B&B Merì",
-        "description": "Parking guide for Cagliari's Castello district: free parking on Viale Buoncammino, paid street areas and the multi-storey car park on Viale Regina Elena, public lifts, ZTL rules, prices and maps.",
-        "keywords": "parking castello cagliari, where to park cagliari, free parking cagliari centre, viale buoncammino parking, regina elena car park cagliari, ztl castello cagliari",
+        "description": "Where to park near Castello in Cagliari: free on Viale Buoncammino, paid areas and car park on Viale Regina Elena, public lifts, ZTL rules. Prices and maps.",
         "og_description": "Free and paid parking near Castello, lifts, ZTL and maps: the B&B Merì parking guide.",
         "back": "Back to the home page",
         "eyebrow": "Parking guide · Castello, Cagliari",
@@ -684,8 +816,7 @@ P = {
     # ===================================================== FRANÇAIS =====
     "fr": {
         "title": "Où se garer à Cagliari près de Castello — B&B Merì",
-        "description": "Guide du stationnement dans le quartier de Castello à Cagliari : parking gratuit sur le Viale Buoncammino, zones payantes et parking à étages du Viale Regina Elena, ascenseurs publics, ZTL, tarifs et cartes.",
-        "keywords": "parking castello cagliari, où se garer cagliari, parking gratuit cagliari centre, viale buoncammino parking, parking regina elena cagliari, ztl castello cagliari",
+        "description": "Où se garer près de Castello à Cagliari : gratuit sur le Viale Buoncammino, zones et parking du Viale Regina Elena, ascenseurs, ZTL. Tarifs et cartes.",
         "og_description": "Parkings gratuits et payants près de Castello, ascenseurs, ZTL et cartes : le guide du B&B Merì.",
         "back": "Retour à l'accueil",
         "eyebrow": "Guide du stationnement · Castello, Cagliari",
@@ -753,8 +884,7 @@ P = {
     # ====================================================== ESPAÑOL =====
     "es": {
         "title": "Dónde aparcar en Cagliari cerca de Castello — B&B Merì",
-        "description": "Guía de aparcamiento para el barrio de Castello en Cagliari: aparcamiento gratuito en el Viale Buoncammino, zonas de pago y aparcamiento de varias plantas en el Viale Regina Elena, ascensores públicos, ZTL, tarifas y mapas.",
-        "keywords": "aparcamiento castello cagliari, dónde aparcar en cagliari, aparcamiento gratis cagliari centro, viale buoncammino aparcamiento, parking regina elena cagliari, ztl castello cagliari",
+        "description": "Dónde aparcar cerca de Castello en Cagliari: gratis en el Viale Buoncammino, zonas y parking del Viale Regina Elena, ascensores, ZTL. Tarifas y mapas.",
         "og_description": "Aparcamientos gratuitos y de pago cerca de Castello, ascensores, ZTL y mapas: la guía del B&B Merì.",
         "back": "Volver a la página principal",
         "eyebrow": "Guía de aparcamiento · Castello, Cagliari",
@@ -817,6 +947,320 @@ P = {
         "sources_label": "Fuentes",
         "help_title": "¿Necesitas ayuda?",
         "help_text": "Escríbenos antes de salir: te recomendamos el mejor aparcamiento según tu hora de llegada. Bajo petición también organizamos el traslado.",
+    },
+}
+
+
+# ------------------------------------- guida "cosa vedere a Castello" --
+#
+# Itinerario a piedi dal B&B. I tempi sono indicativi, a passo tranquillo.
+# Ogni tappa: gruppo ("castello" = il giro del quartiere, "beyond" = appena
+# fuori), ricerca per la mappa e mezzo per il percorso dal B&B.
+
+STOPS = {
+    "cattedrale":     {"group": "castello", "map": "Cattedrale di Santa Maria, Piazza Palazzo, Cagliari", "mode": "walking"},
+    "palazzo":        {"group": "castello", "map": "Palazzo Regio, Piazza Palazzo, Cagliari", "mode": "walking"},
+    "san_pancrazio":  {"group": "castello", "map": "Torre di San Pancrazio, Cagliari", "mode": "walking"},
+    "cittadella":     {"group": "castello", "map": "Cittadella dei Musei, Piazza Arsenale, Cagliari", "mode": "walking"},
+    "porta_cristina": {"group": "castello", "map": "Porta Cristina, Cagliari", "mode": "walking"},
+    "santa_croce":    {"group": "castello", "map": "Bastione di Santa Croce, Cagliari", "mode": "walking"},
+    "elefante":       {"group": "castello", "map": "Torre dell'Elefante, Cagliari", "mode": "walking"},
+    "saint_remy":     {"group": "castello", "map": "Bastione di Saint Remy, Cagliari", "mode": "walking"},
+    "marina":         {"group": "beyond", "map": "Via Roma, Cagliari", "mode": "walking", "icon": "⚓"},
+    "anfiteatro":     {"group": "beyond", "map": "Anfiteatro romano di Cagliari", "mode": "walking", "icon": "🏛️"},
+    "poetto":         {"group": "beyond", "map": "Spiaggia del Poetto, Cagliari", "mode": "transit", "icon": "🏖️"},
+    "molentargius":   {"group": "beyond", "map": "Parco naturale regionale Molentargius-Saline, Cagliari", "mode": "driving", "icon": "🦩"},
+}
+
+G = {
+    # ===================================================== ITALIANO =====
+    "it": {
+        "title": "Cosa vedere a Castello (Cagliari): giro a piedi — B&B Merì",
+        "description": "Itinerario a piedi nel quartiere Castello di Cagliari dal B&B Merì: Cattedrale, Bastione di Saint Remy, torri pisane, musei e dintorni, con tempi e mappe.",
+        "og_description": "Un giro a piedi tra i luoghi più belli di Castello, partendo dal portone del B&B Merì.",
+        "crumb": "Cosa vedere a Castello",
+        "eyebrow": "Guida · Castello, Cagliari",
+        "h1": "Cosa vedere a Castello,<br>a piedi dal B&amp;B",
+        "intro": "Castello è il quartiere fortificato che i Pisani costruirono nel Duecento sulla collina che domina Cagliari. In sardo si chiama <em>Casteddu</em>, lo stesso nome che i sardi danno a tutta la città. Dal nostro portone, in Via Alberto Lamarmora 18, si gira tutto a piedi: ecco l'itinerario che consigliamo, con i tempi a piedi dal B&amp;B.",
+        "before_title": "Prima di uscire",
+        "before_text": "Castello è in salita e le strade sono lastricate: meglio scarpe comode. D'estate i bastioni danno il meglio la mattina presto e al tramonto. Orari e biglietti di chiese, torri e musei cambiano spesso: controllateli prima della visita.",
+        "route_title": "Il giro di Castello, tappa per tappa",
+        "route_intro": "Un anello di circa 2 km nel quartiere: con calma e qualche visita, ci vuole mezza giornata. I tempi indicati sono a piedi dal B&amp;B.",
+        "beyond_title": "Appena fuori da Castello",
+        "beyond_intro": "Quando avete visto Castello, ecco dove andare: dal quartiere sul porto fino alla spiaggia.",
+        "stops": {
+            "cattedrale": ("Cattedrale di Santa Maria", "2 min a piedi",
+                "Il Duomo di Cagliari, in Piazza Palazzo, ha origini pisane del Duecento; la facciata in stile romanico pisano è stata rifatta nel Novecento. All'interno, i due pulpiti di Mastro Guglielmo, ricavati da un pulpito scolpito nel XII secolo per il Duomo di Pisa, e la cripta dei Martiri, scavata nella roccia."),
+            "palazzo": ("Palazzo Regio e Palazzo di Città", "2 min a piedi",
+                "Sulla stessa piazza si affacciano il Palazzo Regio, antica residenza dei viceré che all'inizio dell'Ottocento ospitò la corte dei Savoia, e il Palazzo di Città, il vecchio municipio, oggi sede di mostre dei Musei Civici."),
+            "san_pancrazio": ("Torre di San Pancrazio", "5 min a piedi",
+                "Costruita dai Pisani nel 1305 nella parte più alta di Castello, è la gemella della Torre dell'Elefante. Quando è aperta si può salire in cima: la vista spazia sulla città, sul golfo e sugli stagni."),
+            "cittadella": ("Cittadella dei Musei", "7 min a piedi",
+                "In Piazza Arsenale, negli spazi dell'antico arsenale, ci sono il Museo Archeologico Nazionale, con i bronzetti nuragici e alcune statue dei Giganti di Mont'e Prama, e la Pinacoteca Nazionale. È il posto giusto per scoprire la storia della Sardegna."),
+            "porta_cristina": ("Porta Cristina e Viale Buoncammino", "10 min a piedi",
+                "Da Piazza Arsenale si esce dalle mura passando per Porta Cristina, una porta neoclassica dell'Ottocento, e si arriva sul Viale Buoncammino: un viale alberato sul crinale, con vista sulla città e sugli stagni."),
+            "santa_croce": ("Bastione di Santa Croce e l'ex Ghetto", "5 min a piedi",
+                "Sul lato ovest delle mura, il Bastione di Santa Croce è una terrazza panoramica amatissima al tramonto. Accanto ci sono l'ex Ghetto degli Ebrei, oggi spazio espositivo, e la Basilica di Santa Croce, costruita dove sorgeva la sinagoga."),
+            "elefante": ("Torre dell'Elefante", "4 min a piedi",
+                "Costruita nel 1307 da Giovanni Capula, lo stesso architetto della Torre di San Pancrazio, deve il nome alla piccola statua di un elefante in marmo sulla facciata. Era una delle porte di Castello: passandoci sotto si scende verso la parte bassa della città."),
+            "saint_remy": ("Bastione di Saint Remy", "3 min a piedi",
+                "Il simbolo di Cagliari, costruito tra fine Ottocento e inizio Novecento: una grande scalinata lo collega a Piazza Costituzione. Dalla Terrazza Umberto I la vista abbraccia i tetti di Villanova e della Marina, il porto e il Golfo degli Angeli."),
+            "marina": ("Quartiere Marina e Via Roma", "10 min a piedi",
+                "Scendendo da Castello si arriva alla Marina, il quartiere tra le mura e il porto, con vicoli pieni di trattorie e botteghe. Sotto i portici di Via Roma si passeggia guardando le navi nel porto."),
+            "anfiteatro": ("Anfiteatro romano e Orto Botanico", "15 min a piedi",
+                "L'anfiteatro, del II secolo d.C., è in gran parte scavato nella roccia del colle. A pochi passi c'è l'Orto Botanico dell'Università, un'oasi verde con piante mediterranee e tropicali."),
+            "poetto": ("Spiaggia del Poetto e Sella del Diavolo", "15 min in bus o in auto",
+                "Il Poetto è la spiaggia della città: circa 8 km di sabbia chiara, con chioschi e stabilimenti. All'estremità verso Marina Piccola, il promontorio della Sella del Diavolo ha sentieri panoramici con viste splendide sul golfo."),
+            "molentargius": ("Parco di Molentargius", "15 min in auto",
+                "Tra la città e il Poetto, il parco naturale di Molentargius-Saline protegge stagni e antiche saline dove vivono i fenicotteri rosa. Si visita a piedi o in bicicletta."),
+        },
+        "buttons": {"open": "Apri in Google Maps", "route": "Percorso dal B&B"},
+        "tips_title": "Consigli utili",
+        "tips": [
+            ("🌅", "Il tramonto", "Il posto più bello è il Bastione di Santa Croce, con il sole che scende sullo stagno di Santa Gilla."),
+            ("🛗", "Ascensori pubblici", "Dalla parte bassa della città si sale in Castello con gli ascensori gratuiti di Viale Regina Elena: dove sono e come funzionano lo trovate nella nostra <a class=\"text-link\" href=\"{parking}#lifts\">guida ai parcheggi</a>."),
+            ("☀️", "D'estate", "Nelle ore più calde scegliete musei e chiese; i bastioni danno il meglio la mattina presto e al tramonto. Riempite la borraccia prima di uscire: l'acqua del rubinetto del B&amp;B è potabile."),
+            ("🎉", "Sant'Efisio, 1º maggio", "Il 1º maggio Cagliari celebra Sant'Efisio con una lunga processione di costumi tradizionali da tutta la Sardegna: se siete in città, non perdetela."),
+            ("💬", "Chiedete a noi", f"Vi diamo volentieri consigli su cosa vedere e dove mangiare: scriveteci su WhatsApp al {PHONE}."),
+        ],
+        "updated": "Guida aggiornata a novembre 2026. Orari, aperture e biglietti possono cambiare: verificateli sui siti ufficiali prima della visita.",
+        "help_title": "Volete un consiglio su misura?",
+        "help_text": "Scriveteci: vi suggeriamo cosa vedere in base al tempo che avete e dove mangiare a Castello e dintorni.",
+    },
+
+    # ====================================================== ENGLISH =====
+    "en": {
+        "title": "Things to see in Castello, Cagliari: walking tour — B&B Merì",
+        "description": "A walking tour of Cagliari's Castello quarter from B&B Merì: the Cathedral, Bastione di Saint Remy, Pisan towers, museums and more, with times and maps.",
+        "og_description": "A walk through the highlights of Castello, starting from the front door of B&B Merì.",
+        "crumb": "Things to see in Castello",
+        "eyebrow": "Guide · Castello, Cagliari",
+        "h1": "Things to see in Castello,<br>on foot from the B&amp;B",
+        "intro": "Castello is the fortified quarter the Pisans built in the 13th century on the hill overlooking Cagliari. In Sardinian it's called <em>Casteddu</em>, the same name Sardinians use for the whole city. From our front door at Via Alberto Lamarmora 18 you can see it all on foot: here is the walk we recommend, with walking times from the B&amp;B.",
+        "before_title": "Before you set off",
+        "before_text": "Castello is hilly and the streets are paved with stone: wear comfortable shoes. In summer the bastions are at their best early in the morning and at sunset. Opening hours and tickets for churches, towers and museums change often: check them before your visit.",
+        "route_title": "The Castello walk, stop by stop",
+        "route_intro": "A loop of about 2 km around the quarter: at a relaxed pace, with a few visits, it takes half a day. Times shown are on foot from the B&amp;B.",
+        "beyond_title": "Just outside Castello",
+        "beyond_intro": "Once you've seen Castello, here's where to go next: from the harbour quarter to the beach.",
+        "stops": {
+            "cattedrale": ("Cathedral of Santa Maria", "2 min walk",
+                "Cagliari's cathedral, on Piazza Palazzo, dates back to the Pisans in the 13th century; its Pisan Romanesque façade was rebuilt in the 20th century. Inside, don't miss the two pulpits by Master Guglielmo, made from a single pulpit carved in the 12th century for Pisa Cathedral, and the Crypt of the Martyrs, cut into the rock."),
+            "palazzo": ("Palazzo Regio and Palazzo di Città", "2 min walk",
+                "On the same square stand the Palazzo Regio, the former viceroys' residence that hosted the Savoy court in the early 19th century, and the Palazzo di Città, the old town hall, now used for exhibitions by the city museums."),
+            "san_pancrazio": ("San Pancrazio Tower", "5 min walk",
+                "Built by the Pisans in 1305 on the highest part of Castello, it is the twin of the Elephant Tower. When it's open you can climb to the top for views over the city, the gulf and the lagoons."),
+            "cittadella": ("Cittadella dei Musei", "7 min walk",
+                "On Piazza Arsenale, in the old arsenal, you'll find the National Archaeological Museum, with Nuragic bronze figurines and some of the Giants of Mont'e Prama, and the National Art Gallery. It's the place to discover the history of Sardinia."),
+            "porta_cristina": ("Porta Cristina and Viale Buoncammino", "10 min walk",
+                "From Piazza Arsenale you leave the walls through Porta Cristina, a 19th-century neoclassical gate, and reach Viale Buoncammino: a tree-lined avenue along the ridge with views over the city and the lagoons."),
+            "santa_croce": ("Bastione di Santa Croce and the old Ghetto", "5 min walk",
+                "On the west side of the walls, the Bastione di Santa Croce is a panoramic terrace much loved at sunset. Next to it are the former Jewish Ghetto, now an exhibition space, and the Basilica of Santa Croce, built where the synagogue once stood."),
+            "elefante": ("Elephant Tower", "4 min walk",
+                "Built in 1307 by Giovanni Capula, the architect of the San Pancrazio Tower, it takes its name from the small marble elephant on its façade. It was one of Castello's gates: walk through it to head down to the lower town."),
+            "saint_remy": ("Bastione di Saint Remy", "3 min walk",
+                "Cagliari's landmark, built between the late 19th and early 20th centuries, with a grand staircase rising from Piazza Costituzione. From the Terrazza Umberto I the view takes in the rooftops of Villanova and Marina, the port and the Gulf of Angels."),
+            "marina": ("Marina quarter and Via Roma", "10 min walk",
+                "Walking down from Castello you reach Marina, the quarter between the walls and the port, with lanes full of trattorias and small shops. Under the arcades of Via Roma you can stroll while watching the ships in the harbour."),
+            "anfiteatro": ("Roman Amphitheatre and Botanical Garden", "15 min walk",
+                "The amphitheatre, from the 2nd century AD, is largely carved into the rock of the hill. A few steps away is the University Botanical Garden, a green oasis with Mediterranean and tropical plants."),
+            "poetto": ("Poetto beach and Sella del Diavolo", "15 min by bus or car",
+                "Poetto is the city's beach: about 8 km of pale sand with kiosks and beach clubs. At the Marina Piccola end, the Sella del Diavolo headland has panoramic trails with superb views over the gulf."),
+            "molentargius": ("Molentargius park", "15 min by car",
+                "Between the city and Poetto, the Molentargius-Saline nature park protects lagoons and old salt pans where pink flamingos live. You can explore it on foot or by bike."),
+        },
+        "buttons": {"open": "Open in Google Maps", "route": "Route from the B&B"},
+        "tips_title": "Useful tips",
+        "tips": [
+            ("🌅", "Sunset", "The best spot is the Bastione di Santa Croce, with the sun going down over the Santa Gilla lagoon."),
+            ("🛗", "Public lifts", "From the lower town you can ride up to Castello with the free lifts on Viale Regina Elena: where they are and how they work is in our <a class=\"text-link\" href=\"{parking}#lifts\">parking guide</a>."),
+            ("☀️", "In summer", "In the hottest hours, choose museums and churches; the bastions are best early in the morning and at sunset. Fill your bottle before you go out: the tap water at the B&amp;B is drinkable."),
+            ("🎉", "Sant'Efisio, 1 May", "On 1 May Cagliari celebrates Saint Ephysius with a long procession of traditional costumes from all over Sardinia: if you're in town, don't miss it."),
+            ("💬", "Ask us", f"We're happy to suggest what to see and where to eat: message us on WhatsApp at {PHONE_INTL}."),
+        ],
+        "updated": "Guide updated in November 2026. Opening hours, access and tickets may change: please check the official websites before your visit.",
+        "help_title": "Would you like tailored advice?",
+        "help_text": "Write to us: we'll suggest what to see based on the time you have, and where to eat in and around Castello.",
+    },
+
+    # ===================================================== FRANÇAIS =====
+    "fr": {
+        "title": "Que voir à Castello (Cagliari) : balade à pied — B&B Merì",
+        "description": "Itinéraire à pied dans le quartier de Castello à Cagliari depuis le B&B Merì : cathédrale, Bastion de Saint-Remy, tours pisanes, musées, avec temps et cartes.",
+        "og_description": "Une balade à pied parmi les plus beaux lieux de Castello, au départ de la porte du B&B Merì.",
+        "crumb": "Que voir à Castello",
+        "eyebrow": "Guide · Castello, Cagliari",
+        "h1": "Que voir à Castello,<br>à pied depuis le B&amp;B",
+        "intro": "Castello est le quartier fortifié que les Pisans ont bâti au XIIIe siècle sur la colline qui domine Cagliari. En sarde, on l'appelle <em>Casteddu</em>, le même nom que les Sardes donnent à toute la ville. Depuis notre porte, Via Alberto Lamarmora 18, tout se visite à pied : voici l'itinéraire que nous conseillons, avec les temps de marche depuis le B&amp;B.",
+        "before_title": "Avant de partir",
+        "before_text": "Castello est en pente et les rues sont pavées : prévoyez des chaussures confortables. En été, les bastions sont à leur meilleur tôt le matin et au coucher du soleil. Les horaires et les billets des églises, tours et musées changent souvent : vérifiez-les avant la visite.",
+        "route_title": "La balade dans Castello, étape par étape",
+        "route_intro": "Une boucle d'environ 2 km dans le quartier : tranquillement, avec quelques visites, comptez une demi-journée. Les temps indiqués sont à pied depuis le B&amp;B.",
+        "beyond_title": "Juste à côté de Castello",
+        "beyond_intro": "Une fois Castello visité, voici où aller : du quartier du port jusqu'à la plage.",
+        "stops": {
+            "cattedrale": ("Cathédrale Sainte-Marie", "2 min à pied",
+                "La cathédrale de Cagliari, sur la Piazza Palazzo, remonte aux Pisans du XIIIe siècle ; sa façade de style roman pisan a été refaite au XXe siècle. À l'intérieur, ne manquez pas les deux chaires de Maître Guglielmo, tirées d'une chaire sculptée au XIIe siècle pour la cathédrale de Pise, ni la crypte des Martyrs, creusée dans la roche."),
+            "palazzo": ("Palazzo Regio et Palazzo di Città", "2 min à pied",
+                "Sur la même place se dressent le Palazzo Regio, ancienne résidence des vice-rois qui accueillit la cour de Savoie au début du XIXe siècle, et le Palazzo di Città, l'ancien hôtel de ville, qui accueille aujourd'hui des expositions des musées municipaux."),
+            "san_pancrazio": ("Tour de San Pancrazio", "5 min à pied",
+                "Construite par les Pisans en 1305 dans la partie la plus haute de Castello, c'est la jumelle de la Tour de l'Éléphant. Quand elle est ouverte, on peut monter au sommet : la vue s'étend sur la ville, le golfe et les étangs."),
+            "cittadella": ("Cittadella dei Musei", "7 min à pied",
+                "Sur la Piazza Arsenale, dans l'ancien arsenal, se trouvent le Musée archéologique national, avec les bronzes nuragiques et certaines statues des Géants de Mont'e Prama, et la Pinacothèque nationale. L'endroit idéal pour découvrir l'histoire de la Sardaigne."),
+            "porta_cristina": ("Porta Cristina et Viale Buoncammino", "10 min à pied",
+                "Depuis la Piazza Arsenale, on sort des remparts par la Porta Cristina, une porte néoclassique du XIXe siècle, pour rejoindre le Viale Buoncammino : une avenue arborée sur la crête, avec vue sur la ville et les étangs."),
+            "santa_croce": ("Bastion de Santa Croce et l'ancien ghetto", "5 min à pied",
+                "Sur le côté ouest des remparts, le Bastion de Santa Croce est une terrasse panoramique très appréciée au coucher du soleil. Juste à côté se trouvent l'ancien ghetto juif, aujourd'hui espace d'exposition, et la basilique Santa Croce, bâtie à l'emplacement de la synagogue."),
+            "elefante": ("Tour de l'Éléphant", "4 min à pied",
+                "Construite en 1307 par Giovanni Capula, l'architecte de la Tour de San Pancrazio, elle doit son nom à la petite statue d'éléphant en marbre de sa façade. C'était l'une des portes de Castello : en passant dessous, on descend vers la ville basse."),
+            "saint_remy": ("Bastion de Saint-Remy", "3 min à pied",
+                "Le symbole de Cagliari, construit entre la fin du XIXe et le début du XXe siècle et relié à la Piazza Costituzione par un grand escalier. Depuis la terrasse Umberto I, la vue embrasse les toits de Villanova et de la Marina, le port et le golfe des Anges."),
+            "marina": ("Quartier de la Marina et Via Roma", "10 min à pied",
+                "En descendant de Castello, on arrive à la Marina, le quartier entre les remparts et le port, avec ses ruelles pleines de trattorias et de boutiques. Sous les arcades de la Via Roma, on se promène face aux bateaux du port."),
+            "anfiteatro": ("Amphithéâtre romain et jardin botanique", "15 min à pied",
+                "L'amphithéâtre, du IIe siècle après J.-C., est en grande partie creusé dans la roche de la colline. À deux pas se trouve le jardin botanique de l'université, une oasis de verdure avec des plantes méditerranéennes et tropicales."),
+            "poetto": ("Plage du Poetto et Sella del Diavolo", "15 min en bus ou en voiture",
+                "Le Poetto est la plage de la ville : environ 8 km de sable clair, avec kiosques et établissements de plage. Côté Marina Piccola, le promontoire de la Sella del Diavolo offre des sentiers panoramiques avec de superbes vues sur le golfe."),
+            "molentargius": ("Parc de Molentargius", "15 min en voiture",
+                "Entre la ville et le Poetto, le parc naturel de Molentargius-Saline protège des étangs et d'anciens marais salants où vivent les flamants roses. On le découvre à pied ou à vélo."),
+        },
+        "buttons": {"open": "Ouvrir dans Google Maps", "route": "Itinéraire depuis le B&B"},
+        "tips_title": "Conseils utiles",
+        "tips": [
+            ("🌅", "Coucher de soleil", "Le plus bel endroit est le Bastion de Santa Croce, avec le soleil qui se couche sur l'étang de Santa Gilla."),
+            ("🛗", "Ascenseurs publics", "Depuis la ville basse, on monte à Castello avec les ascenseurs gratuits du Viale Regina Elena : où ils se trouvent et comment ils fonctionnent, c'est dans notre <a class=\"text-link\" href=\"{parking}#lifts\">guide du stationnement</a>."),
+            ("☀️", "En été", "Aux heures les plus chaudes, privilégiez musées et églises ; les bastions sont à leur meilleur tôt le matin et au coucher du soleil. Remplissez votre gourde avant de sortir : l'eau du robinet du B&amp;B est potable."),
+            ("🎉", "Sant'Efisio, 1er mai", "Le 1er mai, Cagliari fête saint Éphyse avec une longue procession de costumes traditionnels venus de toute la Sardaigne : si vous êtes en ville, ne la manquez pas."),
+            ("💬", "Demandez-nous", f"Nous vous conseillons volontiers sur ce qu'il faut voir et où manger : écrivez-nous sur WhatsApp au {PHONE_INTL}."),
+        ],
+        "updated": "Guide mis à jour en novembre 2026. Horaires, ouvertures et billets peuvent changer : vérifiez-les sur les sites officiels avant votre visite.",
+        "help_title": "Envie d'un conseil sur mesure ?",
+        "help_text": "Écrivez-nous : nous vous suggérons quoi voir selon le temps dont vous disposez, et où manger à Castello et aux alentours.",
+    },
+
+    # ====================================================== ESPAÑOL =====
+    "es": {
+        "title": "Qué ver en Castello (Cagliari): paseo a pie — B&B Merì",
+        "description": "Itinerario a pie por el barrio de Castello en Cagliari desde el B&B Merì: catedral, Bastión de Saint Remy, torres pisanas, museos y alrededores, con tiempos y mapas.",
+        "og_description": "Un paseo a pie por los rincones más bonitos de Castello, saliendo de la puerta del B&B Merì.",
+        "crumb": "Qué ver en Castello",
+        "eyebrow": "Guía · Castello, Cagliari",
+        "h1": "Qué ver en Castello,<br>a pie desde el B&amp;B",
+        "intro": "Castello es el barrio fortificado que los pisanos construyeron en el siglo XIII sobre la colina que domina Cagliari. En sardo se llama <em>Casteddu</em>, el mismo nombre que los sardos dan a toda la ciudad. Desde nuestra puerta, en Via Alberto Lamarmora 18, todo se recorre a pie: este es el itinerario que recomendamos, con los tiempos a pie desde el B&amp;B.",
+        "before_title": "Antes de salir",
+        "before_text": "Castello está en cuesta y las calles son de piedra: mejor llevar calzado cómodo. En verano, los bastiones lucen más temprano por la mañana y al atardecer. Los horarios y las entradas de iglesias, torres y museos cambian a menudo: compruébalos antes de la visita.",
+        "route_title": "El paseo por Castello, parada a parada",
+        "route_intro": "Un recorrido circular de unos 2 km por el barrio: con calma y alguna visita, lleva media jornada. Los tiempos indicados son a pie desde el B&amp;B.",
+        "beyond_title": "Justo fuera de Castello",
+        "beyond_intro": "Cuando hayas visto Castello, aquí tienes adónde ir: del barrio del puerto a la playa.",
+        "stops": {
+            "cattedrale": ("Catedral de Santa María", "2 min a pie",
+                "La catedral de Cagliari, en la Piazza Palazzo, tiene origen pisano del siglo XIII; su fachada de estilo románico pisano se rehízo en el siglo XX. Dentro destacan los dos púlpitos del Maestro Guglielmo, obtenidos de un púlpito tallado en el siglo XII para la catedral de Pisa, y la cripta de los Mártires, excavada en la roca."),
+            "palazzo": ("Palazzo Regio y Palazzo di Città", "2 min a pie",
+                "En la misma plaza se asoman el Palazzo Regio, antigua residencia de los virreyes que a principios del siglo XIX acogió a la corte de los Saboya, y el Palazzo di Città, el antiguo ayuntamiento, hoy sede de exposiciones de los museos municipales."),
+            "san_pancrazio": ("Torre de San Pancrazio", "5 min a pie",
+                "Construida por los pisanos en 1305 en la parte más alta de Castello, es la gemela de la Torre del Elefante. Cuando está abierta se puede subir a lo alto: la vista abarca la ciudad, el golfo y las lagunas."),
+            "cittadella": ("Cittadella dei Musei", "7 min a pie",
+                "En la Piazza Arsenale, en el antiguo arsenal, están el Museo Arqueológico Nacional, con los bronces nurágicos y algunas estatuas de los Gigantes de Mont'e Prama, y la Pinacoteca Nacional. Es el lugar perfecto para descubrir la historia de Cerdeña."),
+            "porta_cristina": ("Porta Cristina y Viale Buoncammino", "10 min a pie",
+                "Desde la Piazza Arsenale se sale de las murallas por la Porta Cristina, una puerta neoclásica del siglo XIX, y se llega al Viale Buoncammino: una avenida arbolada sobre la colina, con vistas a la ciudad y a las lagunas."),
+            "santa_croce": ("Bastión de Santa Croce y el antiguo gueto", "5 min a pie",
+                "En el lado oeste de las murallas, el Bastión de Santa Croce es una terraza panorámica muy querida al atardecer. Al lado están el antiguo gueto judío, hoy espacio de exposiciones, y la basílica de Santa Croce, construida donde estaba la sinagoga."),
+            "elefante": ("Torre del Elefante", "4 min a pie",
+                "Construida en 1307 por Giovanni Capula, el arquitecto de la Torre de San Pancrazio, debe su nombre a la pequeña estatua de un elefante de mármol de su fachada. Era una de las puertas de Castello: pasando por debajo se baja hacia la parte baja de la ciudad."),
+            "saint_remy": ("Bastión de Saint Remy", "3 min a pie",
+                "El símbolo de Cagliari, construido entre finales del siglo XIX y principios del XX y unido a la Piazza Costituzione por una gran escalinata. Desde la Terrazza Umberto I la vista abarca los tejados de Villanova y la Marina, el puerto y el golfo de los Ángeles."),
+            "marina": ("Barrio de la Marina y Via Roma", "10 min a pie",
+                "Bajando de Castello se llega a la Marina, el barrio entre las murallas y el puerto, con callejuelas llenas de trattorias y tiendas. Bajo los soportales de la Via Roma se pasea mirando los barcos del puerto."),
+            "anfiteatro": ("Anfiteatro romano y Jardín Botánico", "15 min a pie",
+                "El anfiteatro, del siglo II d. C., está excavado en gran parte en la roca de la colina. A pocos pasos está el Jardín Botánico de la Universidad, un oasis verde con plantas mediterráneas y tropicales."),
+            "poetto": ("Playa del Poetto y Sella del Diavolo", "15 min en autobús o en coche",
+                "El Poetto es la playa de la ciudad: unos 8 km de arena clara, con quioscos y establecimientos de playa. En el extremo de Marina Piccola, el promontorio de la Sella del Diavolo tiene senderos panorámicos con vistas espléndidas sobre el golfo."),
+            "molentargius": ("Parque de Molentargius", "15 min en coche",
+                "Entre la ciudad y el Poetto, el parque natural de Molentargius-Saline protege lagunas y antiguas salinas donde viven los flamencos rosas. Se recorre a pie o en bicicleta."),
+        },
+        "buttons": {"open": "Abrir en Google Maps", "route": "Ruta desde el B&B"},
+        "tips_title": "Consejos útiles",
+        "tips": [
+            ("🌅", "El atardecer", "El mejor sitio es el Bastión de Santa Croce, con el sol poniéndose sobre la laguna de Santa Gilla."),
+            ("🛗", "Ascensores públicos", "Desde la parte baja de la ciudad se sube a Castello con los ascensores gratuitos del Viale Regina Elena: dónde están y cómo funcionan lo tienes en nuestra <a class=\"text-link\" href=\"{parking}#lifts\">guía de aparcamiento</a>."),
+            ("☀️", "En verano", "En las horas de más calor, elige museos e iglesias; los bastiones lucen más temprano por la mañana y al atardecer. Llena tu botella antes de salir: el agua del grifo del B&amp;B es potable."),
+            ("🎉", "San Efisio, 1 de mayo", "El 1 de mayo Cagliari celebra a San Efisio con una larga procesión de trajes tradicionales de toda Cerdeña: si estás en la ciudad, no te la pierdas."),
+            ("💬", "Pregúntanos", f"Te aconsejamos con gusto qué ver y dónde comer: escríbenos por WhatsApp al {PHONE_INTL}."),
+        ],
+        "updated": "Guía actualizada en noviembre de 2026. Horarios, aperturas y entradas pueden cambiar: compruébalos en las webs oficiales antes de la visita.",
+        "help_title": "¿Quieres un consejo a medida?",
+        "help_text": "Escríbenos: te sugerimos qué ver según el tiempo que tengas y dónde comer en Castello y alrededores.",
+    },
+}
+
+
+# ------------------------------------------------ foto della camera --
+#
+# Le foto stanno in GALLERY (le carica chi gestisce il sito, anche dal sito di
+# GitHub); l'ordine e' in ordine.txt nella stessa cartella. Lo script le mette
+# direttamente nella pagina (cosi' le vedono anche Google Immagini e gli
+# assistenti AI) e, se c'e' Pillow, ne crea versioni WebP piu' leggere in
+# OPTIMIZED piu' la copertina per i social (1200x630).
+#
+# PHOTO_ALT: descrizione di ogni foto nelle 4 lingue (testo alternativo, letto
+# da Google e dagli screen reader). Per una foto nuova non elencata qui si usa
+# la nota scritta in ordine.txt dopo il "#" (in italiano), altrimenti una
+# descrizione generica.
+
+GALLERY = "assets/img/camera-matrimoniale"
+OPTIMIZED = "assets/img/ottimizzate"
+WIDTHS = (640, 1280)
+IMAGE_RE = re.compile(r".+\.(jpe?g|png|webp|gif)$", re.I)
+
+PHOTO_ALT = {
+    "file_00000000fc3881f4b83c3b7bc0432fc9.jpg": {
+        "it": "Camera Matrimoniale del B&B Merì: letto matrimoniale, soffitto con travi in legno, portafinestra e tavolino con due sedie",
+        "en": "Double Room at B&B Merì: double bed, wooden-beamed ceiling, French window and a small table with two chairs",
+        "fr": "Chambre double du B&B Merì : lit double, plafond à poutres en bois, porte-fenêtre et petite table avec deux chaises",
+        "es": "Habitación doble del B&B Merì: cama de matrimonio, techo con vigas de madera, puerta balconera y mesita con dos sillas",
+    },
+    "IMG-20261007-WA0036.jpg": {
+        "it": "Letto matrimoniale con due comodini e lampade, sotto un quadro artigianale in legno con una città sotto la luna",
+        "en": "Double bed with two bedside tables and lamps, beneath a handmade wooden artwork of a town under the moon",
+        "fr": "Lit double avec deux tables de chevet et lampes, sous un tableau artisanal en bois représentant une ville sous la lune",
+        "es": "Cama de matrimonio con dos mesitas de noche y lámparas, bajo un cuadro artesanal de madera con una ciudad bajo la luna",
+    },
+    "file_00000000545881f489d19ce6cf378508.jpg": {
+        "it": "Tavolino con due sedie, portafinestra con tende e angolo caffè con bollitore nella Camera Matrimoniale",
+        "en": "Small table with two chairs, French window with curtains and a coffee corner with kettle in the Double Room",
+        "fr": "Petite table avec deux chaises, porte-fenêtre avec rideaux et coin café avec bouilloire dans la chambre double",
+        "es": "Mesita con dos sillas, puerta balconera con cortinas y rincón de café con hervidor en la habitación doble",
+    },
+    "IMG-20260818-WA0034.jpg": {
+        "it": "Il letto matrimoniale visto di fronte, con copriletto verde salvia e cuscini bianchi",
+        "en": "The double bed seen from the front, with a sage-green bedspread and white pillows",
+        "fr": "Le lit double vu de face, avec couvre-lit vert sauge et oreillers blancs",
+        "es": "La cama de matrimonio vista de frente, con colcha verde salvia y almohadas blancas",
+    },
+    "IMG-20261007-WA0035.jpg": {
+        "it": "Porta antica in legno a due ante sotto un arco in mattoni a vista",
+        "en": "Antique double wooden door beneath an exposed brick arch",
+        "fr": "Porte ancienne en bois à deux battants sous un arc en briques apparentes",
+        "es": "Puerta antigua de madera de dos hojas bajo un arco de ladrillo visto",
+    },
+    "IMG-20260620-WA0005.jpg": {
+        "it": "Il quadro in legno sopra il letto illuminato di notte: una luna sopra un profilo di case",
+        "en": "The wooden artwork above the bed lit up at night: a moon over a skyline of houses",
+        "fr": "Le tableau en bois au-dessus du lit, éclairé la nuit : une lune au-dessus de silhouettes de maisons",
+        "es": "El cuadro de madera sobre la cama iluminado de noche: una luna sobre un perfil de casas",
+    },
+    "IMG-20260620-WA0027.jpg": {
+        "it": "Bagno privato con doccia, lavabo e soffitto in legno",
+        "en": "Private bathroom with shower, washbasin and wooden ceiling",
+        "fr": "Salle de bains privative avec douche, lavabo et plafond en bois",
+        "es": "Baño privado con ducha, lavabo y techo de madera",
+    },
+    "file_00000000a1048246ab7bd8f2feb175b6.jpg": {
+        "it": "Bagno privato con WC, bidet e asciugamani puliti",
+        "en": "Private bathroom with toilet, bidet and fresh towels",
+        "fr": "Salle de bains privative avec WC, bidet et serviettes propres",
+        "es": "Baño privado con inodoro, bidé y toallas limpias",
     },
 }
 
@@ -884,98 +1328,477 @@ def maps_walk(origin):
             + "&destination=" + quote_plus(DEST) + "&travelmode=walking")
 
 
-def structured_data(lang, t):
+def maps_from_bnb(destination, mode="walking"):
+    """Percorso su Google Maps dal B&B a un luogo (a piedi, in bus o in auto)."""
+    return ("https://www.google.com/maps/dir/?api=1&origin=" + quote_plus(DEST)
+            + "&destination=" + quote_plus(destination) + "&travelmode=" + mode)
+
+
+def today():
+    return datetime.datetime.now(TZ).date().isoformat()
+
+
+# ------------------------------------------------- foto: dimensioni --
+
+SOF_MARKERS = {0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF}
+
+
+def jpeg_orientation(data):
+    """Orientamento EXIF di una foto JPEG (1 = dritta; 5-8 = ruotata di 90 gradi)."""
+    i = data.find(b"Exif\x00\x00")
+    if i < 0 or i > 65536:
+        return 1
+    tiff = data[i + 6:]
+    big = tiff[:2] == b"MM"
+    order = "big" if big else "little"
+    try:
+        ifd = int.from_bytes(tiff[4:8], order)
+        count = int.from_bytes(tiff[ifd:ifd + 2], order)
+        for k in range(count):
+            entry = tiff[ifd + 2 + 12 * k: ifd + 14 + 12 * k]
+            if int.from_bytes(entry[0:2], order) == 0x0112:
+                return int.from_bytes(entry[8:10], order)
+    except (ValueError, IndexError):
+        pass
+    return 1
+
+
+def image_size(path):
+    """(larghezza, altezza) di una foto JPEG/PNG/GIF/WebP come la mostra il
+    browser, senza librerie esterne. None se il formato non e' riconosciuto."""
+    data = path.read_bytes()
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return struct.unpack(">II", data[16:24])
+    if data[:6] in (b"GIF87a", b"GIF89a"):
+        return struct.unpack("<HH", data[6:10])
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        kind = data[12:16]
+        if kind == b"VP8X":
+            return (int.from_bytes(data[24:27], "little") + 1, int.from_bytes(data[27:30], "little") + 1)
+        if kind == b"VP8 ":
+            w, h = struct.unpack("<HH", data[26:30])
+            return w & 0x3FFF, h & 0x3FFF
+        if kind == b"VP8L":
+            b = data[21:25]
+            return (1 + (((b[1] & 0x3F) << 8) | b[0]),
+                    1 + (((b[3] & 0x0F) << 10) | (b[2] << 2) | ((b[1] & 0xC0) >> 6)))
+        return None
+    if data[:2] == b"\xff\xd8":
+        i, n = 2, len(data)
+        while i + 9 < n:
+            if data[i] != 0xFF:
+                i += 1
+                continue
+            marker = data[i + 1]
+            if marker == 0xFF:
+                i += 1
+                continue
+            if marker in (0xD8, 0x01) or 0xD0 <= marker <= 0xD7:
+                i += 2
+                continue
+            if marker in SOF_MARKERS:
+                h = int.from_bytes(data[i + 5:i + 7], "big")
+                w = int.from_bytes(data[i + 7:i + 9], "big")
+                return (h, w) if jpeg_orientation(data) >= 5 else (w, h)
+            i += 2 + int.from_bytes(data[i + 2:i + 4], "big")
+    return None
+
+
+def natural_key(name):
+    """Ordine "naturale": foto2 prima di foto10, maiuscole indifferenti."""
+    return [int(x) if x.isdigit() else x for x in re.split(r"(\d+)", name.lower())]
+
+
+# ------------------------------------------------- foto: galleria --
+
+def gallery_photos():
+    """Foto della camera nell'ordine di ordine.txt (quelle non elencate in fondo).
+
+    Ogni foto: nome del file, percorso nel sito, dimensioni, impronta del
+    contenuto e la nota scritta in ordine.txt dopo il "#"."""
+    folder = ROOT / GALLERY
+    if not folder.is_dir():
+        return []
+    wanted, notes = [], {}
+    order_file = folder / "ordine.txt"
+    if order_file.exists():
+        for line in order_file.read_text(encoding="utf-8").splitlines():
+            name, _, note = line.partition("#")
+            name = name.strip().lower()
+            if name:
+                wanted.append(name)
+                notes[name] = note.strip()
+    photos = []
+    for path in folder.iterdir():
+        if not (path.is_file() and IMAGE_RE.match(path.name)):
+            continue
+        size = image_size(path)
+        if not size:
+            print("attenzione: formato non riconosciuto, foto saltata:", path.name)
+            continue
+        slug = re.sub(r"[^a-z0-9]+", "-", path.stem.lower()).strip("-")
+        photos.append({
+            "name": path.name,
+            "path": path,
+            "rel": f"{GALLERY}/{path.name}",
+            "w": size[0],
+            "h": size[1],
+            "sha": hashlib.sha1(path.read_bytes()).hexdigest(),
+            "slug": f"{Path(GALLERY).name}-{slug}",
+            "note": notes.get(path.name.lower(), ""),
+            "variants": [],
+        })
+
+    def rank(ph):
+        n = ph["name"].lower()
+        return (wanted.index(n) if n in wanted else len(wanted), natural_key(ph["name"]))
+
+    return sorted(photos, key=rank)
+
+
+def pillow():
+    """Il modulo Image di Pillow, oppure None se Pillow non e' installato."""
+    try:
+        from PIL import Image, ImageOps   # noqa: F401
+        return Image
+    except ImportError:
+        return None
+
+
+def optimize_photos(photos):
+    """Crea (se mancano) le versioni WebP delle foto in OPTIMIZED, piu' la
+    copertina per i social, e cancella quelle che non servono piu'.
+    Restituisce la copertina: {"rel", "w", "h", "photo"}."""
+    Image = pillow()
+    if Image:
+        from PIL import ImageOps
+    keep = set()
+
+    for ph in photos:
+        widths = sorted({min(w, ph["w"]) for w in WIDTHS})
+        for w in widths:
+            rel_path = f"{OPTIMIZED}/{ph['slug']}-{ph['sha'][:6]}-{w}.webp"
+            keep.add(rel_path)
+            out = ROOT / rel_path
+            if not out.exists() and Image:
+                out.parent.mkdir(parents=True, exist_ok=True)
+                with Image.open(ph["path"]) as im:
+                    im = ImageOps.exif_transpose(im).convert("RGB")
+                    h = round(im.height * w / im.width)
+                    im.resize((w, h), Image.LANCZOS).save(out, "WEBP", quality=78, method=6)
+                print("creata", rel_path)
+            if out.exists():
+                ph["variants"].append((rel_path, w))
+
+    cover = None
+    if photos:
+        # La prima foto orizzontale nell'ordine scelto in ordine.txt
+        ph = next((p for p in photos if p["w"] > p["h"]), photos[0])
+        rel_path = f"{OPTIMIZED}/copertina-{ph['sha'][:6]}.jpg"
+        keep.add(rel_path)
+        out = ROOT / rel_path
+        if not out.exists() and Image:
+            out.parent.mkdir(parents=True, exist_ok=True)
+            with Image.open(ph["path"]) as im:
+                im = ImageOps.exif_transpose(im).convert("RGB")
+                im = ImageOps.fit(im, (1200, 630), Image.LANCZOS, centering=(0.5, 0.55))
+                im.save(out, "JPEG", quality=82, optimize=True, progressive=True)
+            print("creata", rel_path)
+        if out.exists():
+            cover = {"rel": rel_path, "w": 1200, "h": 630, "photo": ph}
+        else:
+            cover = {"rel": ph["rel"], "w": ph["w"], "h": ph["h"], "photo": ph}
+
+    folder = ROOT / OPTIMIZED
+    if folder.is_dir():
+        for f in folder.iterdir():
+            if f.is_file() and f"{OPTIMIZED}/{f.name}" not in keep:
+                f.unlink()
+                print("cancellata", f"{OPTIMIZED}/{f.name}")
+    return cover
+
+
+def photo_alt(ph, lang, index):
+    """Testo alternativo di una foto nella lingua scelta."""
+    alts = PHOTO_ALT.get(ph["name"], {})
+    if alts.get(lang):
+        return alts[lang]
+    room = T[lang]["room1"]["name"]
+    if lang == "it" and ph["note"]:
+        return f"{room} del B&B Merì — {ph['note']}"
+    return f"{room} — B&B Merì, Cagliari ({T[lang]['photo_word']} {index + 1})"
+
+
+def abs_url(rel_path):
+    return SITE + quote(rel_path)
+
+
+# ------------------------------------------------- dati strutturati --
+#
+# Un unico "grafo" schema.org per pagina: la struttura (BedAndBreakfast), il
+# sito (WebSite), la pagina (WebPage) e cio' che contiene (FAQ, parcheggi,
+# itinerario). Gli @id collegano le parti tra loro e tra le pagine.
+
+BNB_ID = SITE + "#bnb"
+WEBSITE_ID = SITE + "#website"
+LASTMOD_TOKEN = "@@LASTMOD@@"   # sostituito con la data di ultima modifica
+
+
+def graph(*nodes):
+    return json_ld({"@context": "https://schema.org", "@graph": [n for n in nodes if n]})
+
+
+def postal_address(lang):
+    return {
+        "@type": "PostalAddress",
+        "streetAddress": STREET,
+        "addressLocality": "Cagliari",
+        "addressRegion": T[lang]["region"],
+        "postalCode": "09124",
+        "addressCountry": "IT",
+    }
+
+
+def bnb_entity(lang, photos, full=True):
+    """La struttura. `full=False`: versione breve per le pagine secondarie."""
+    t = T[lang]
+
     def feature(name):
         return {"@type": "LocationFeatureSpecification", "name": name, "value": True}
 
     bnb = {
-        "@context": "https://schema.org",
         "@type": "BedAndBreakfast",
+        "@id": BNB_ID,
         "name": "B&B Merì",
-        "description": t["ld_description"],
         "url": url_of(HOME_DIR[lang]),
-        "image": SITE + "assets/img/og-cover.svg",
-        "logo": SITE + "assets/img/logo.svg",
-        "email": EMAIL,
         "telephone": PHONE_INTL,
+        "email": EMAIL,
+        "address": postal_address(lang),
+    }
+    if photos:
+        bnb["image"] = [abs_url(ph["rel"]) for ph in photos]
+    if not full:
+        return bnb
+    rooms = []
+    for i, (name, desc, feats) in enumerate(t["ld_rooms"]):
+        room = {
+            "@type": "HotelRoom",
+            "name": name,
+            "description": desc,
+            "bed": {"@type": "BedDetails", "numberOfBeds": 1, "typeOfBed": t["ld_bed"]},
+            "occupancy": {"@type": "QuantitativeValue", "maxValue": 2, "unitCode": "C62"},
+            "amenityFeature": [feature(n) for n in feats],
+        }
+        if i == 0 and photos:
+            room["image"] = [abs_url(ph["rel"]) for ph in photos]
+        rooms.append(room)
+    bnb.update({
+        "alternateName": ["B&B Meri", "Merì Bed & Breakfast", "Merì B&B Cagliari"],
+        "description": t["ld_description"],
+        "logo": SITE + "assets/img/logo-512.png",
         "priceRange": "€€",
         "currenciesAccepted": "EUR",
         "checkinTime": "15:00",
         "checkoutTime": "10:30",
-        "numberOfRooms": 2,
+        "numberOfRooms": len(rooms),
         "petsAllowed": False,
         "smokingAllowed": False,
         "availableLanguage": ["Italian", "English", "French", "Spanish"],
         "identifier": {"@type": "PropertyValue", "propertyID": "CIN", "value": CIN},
-        "address": {
-            "@type": "PostalAddress",
-            "streetAddress": STREET,
-            "addressLocality": "Cagliari",
-            "addressRegion": t["region"],
-            "postalCode": "09124",
-            "addressCountry": "IT",
+        "geo": {"@type": "GeoCoordinates", "latitude": GEO[0], "longitude": GEO[1]},
+        "hasMap": MAPS_URL,
+        "containedInPlace": {"@type": "Place", "name": "Castello, Cagliari",
+                             "containedInPlace": {"@type": "City", "name": "Cagliari"}},
+        "contactPoint": {
+            "@type": "ContactPoint",
+            "contactType": "reservations",
+            "telephone": PHONE_INTL,
+            "email": EMAIL,
+            "availableLanguage": ["Italian", "English", "French", "Spanish"],
         },
-        "geo": {"@type": "GeoCoordinates", "latitude": 39.2183, "longitude": 9.1164},
         "amenityFeature": [feature(n) for n in t["ld_amenities"]],
-        "containsPlace": [
-            {
-                "@type": "HotelRoom",
-                "name": name,
-                "description": desc,
-                "occupancy": {"@type": "QuantitativeValue", "maxValue": 2},
-                "amenityFeature": [feature(n) for n in feats],
-            }
-            for name, desc, feats in t["ld_rooms"]
+        "containsPlace": rooms,
+    })
+    if SAME_AS:
+        bnb["sameAs"] = list(SAME_AS)
+    return bnb
+
+
+def website_entity():
+    return {
+        "@type": "WebSite",
+        "@id": WEBSITE_ID,
+        "url": SITE,
+        "name": "B&B Merì",
+        "alternateName": ["Merì Bed & Breakfast", "meribnb.it"],
+        "inLanguage": LANGS,
+        "publisher": {"@id": BNB_ID},
+    }
+
+
+def webpage_entity(lang, folder, title, description, cover_url=None, crumbs=False, about=None):
+    url = url_of(folder)
+    page = {
+        "@type": "WebPage",
+        "@id": url + "#webpage",
+        "url": url,
+        "name": title,
+        "description": description,
+        "inLanguage": lang,
+        "isPartOf": {"@id": WEBSITE_ID},
+        "about": about or {"@id": BNB_ID},
+        "dateModified": LASTMOD_TOKEN,
+    }
+    if cover_url:
+        page["primaryImageOfPage"] = {"@type": "ImageObject", "url": cover_url}
+    if crumbs:
+        page["breadcrumb"] = {"@id": url + "#breadcrumb"}
+    return page
+
+
+def breadcrumb_entity(lang, folder, name):
+    url = url_of(folder)
+    return {
+        "@type": "BreadcrumbList",
+        "@id": url + "#breadcrumb",
+        "itemListElement": [
+            {"@type": "ListItem", "position": 1, "name": T[lang]["home_crumb"], "item": url_of(HOME_DIR[lang])},
+            {"@type": "ListItem", "position": 2, "name": name, "item": url},
         ],
     }
+
+
+def home_structured_data(lang, photos, cover_url):
+    t = T[lang]
+    folder = HOME_DIR[lang]
     faq = {
-        "@context": "https://schema.org",
         "@type": "FAQPage",
+        "@id": url_of(folder) + "#faq",
+        "inLanguage": lang,
+        "isPartOf": {"@id": WEBSITE_ID},
         "mainEntity": [
             {"@type": "Question", "name": q,
              "acceptedAnswer": {"@type": "Answer", "text": a}}
             for q, a in t["faq"]
         ],
     }
-    return [("BedAndBreakfast", json_ld(bnb)), ("FAQ", json_ld(faq))]
+    return [("BedAndBreakfast, WebSite, WebPage, FAQ", graph(
+        bnb_entity(lang, photos),
+        website_entity(),
+        webpage_entity(lang, folder, t["title"], t["description"], cover_url),
+        faq,
+    ))]
 
 
-def parking_structured_data(lang, pt):
-    page = {
-        "@context": "https://schema.org",
-        "@type": "WebPage",
-        "name": pt["title"],
-        "description": pt["description"],
-        "url": url_of(PARK_DIR[lang]),
+def parking_structured_data(lang, pt, photos):
+    folder = PARK_DIR[lang]
+    page = webpage_entity(lang, folder, pt["title"], pt["description"], crumbs=True)
+    page["mainEntity"] = {
+        "@type": "ItemList",
+        "itemListElement": [
+            {
+                "@type": "ListItem",
+                "position": i + 1,
+                "item": {
+                    "@type": "ParkingFacility",
+                    "name": pt["spots"][key][0],
+                    "description": plain(pt["spots"][key][3]),
+                    "address": {"@type": "PostalAddress", "streetAddress": SPOTS[key]["street"],
+                                "addressLocality": "Cagliari", "addressCountry": "IT"},
+                },
+            }
+            for i, key in enumerate(FACILITIES)
+        ],
+    }
+    return [("WebPage, BreadcrumbList, ParkingFacility", graph(
+        page,
+        breadcrumb_entity(lang, folder, plain(pt["h1"].replace("<br>", " "))),
+        bnb_entity(lang, photos, full=False),
+        website_entity(),
+    ))]
+
+
+def guide_structured_data(lang, gt, photos, cover_url):
+    folder = GUIDE_DIR[lang]
+    url = url_of(folder)
+    castello = {"@type": "Place", "name": "Castello, Cagliari",
+                "address": {"@type": "PostalAddress", "addressLocality": "Cagliari", "addressCountry": "IT"}}
+    page = webpage_entity(lang, folder, gt["title"], gt["description"], cover_url, crumbs=True, about=castello)
+    article = {
+        "@type": "Article",
+        "@id": url + "#article",
+        "headline": plain(gt["h1"].replace("<br>", " ")),
+        "description": gt["description"],
         "inLanguage": lang,
-        "about": {"@type": "BedAndBreakfast", "name": "B&B Merì", "url": url_of(HOME_DIR[lang])},
-        "mainEntity": {
+        "datePublished": GUIDE_PUBLISHED,
+        "dateModified": LASTMOD_TOKEN,
+        "author": {"@type": "Organization", "name": "B&B Merì", "url": SITE},
+        "publisher": {"@id": BNB_ID},
+        "mainEntityOfPage": {"@id": url + "#webpage"},
+        "about": {"@id": url + "#itinerary"},
+    }
+    if cover_url:
+        article["image"] = cover_url
+    trip = {
+        "@type": "TouristTrip",
+        "@id": url + "#itinerary",
+        "name": plain(gt["route_title"]),
+        "description": plain(gt["route_intro"]),
+        "provider": {"@id": BNB_ID},
+        "itinerary": {
             "@type": "ItemList",
             "itemListElement": [
                 {
                     "@type": "ListItem",
                     "position": i + 1,
                     "item": {
-                        "@type": "ParkingFacility",
-                        "name": pt["spots"][key][0],
-                        "description": plain(pt["spots"][key][3]),
-                        "address": {"@type": "PostalAddress", "streetAddress": SPOTS[key]["street"],
-                                    "addressLocality": "Cagliari", "addressCountry": "IT"},
+                        "@type": "TouristAttraction",
+                        "name": gt["stops"][key][0],
+                        "description": plain(gt["stops"][key][2]),
+                        "address": {"@type": "PostalAddress", "addressLocality": "Cagliari", "addressCountry": "IT"},
                     },
                 }
-                for i, key in enumerate(FACILITIES)
+                for i, key in enumerate(STOPS)
             ],
         },
     }
-    return [("WebPage", json_ld(page))]
+    return [("WebPage, BreadcrumbList, Article, TouristTrip", graph(
+        page,
+        breadcrumb_entity(lang, folder, gt["crumb"]),
+        article,
+        trip,
+        bnb_entity(lang, photos, full=False),
+        website_entity(),
+    ))]
 
 
 # ------------------------------------------------- parti in comune --
 
-def head(lang, folder, alt_dirs, title, description, keywords, og_description, ld_blocks, extra_meta=""):
+ROBOTS_INDEX = "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
+
+
+def head(lang, folder, alt_dirs, title, description, og_description, ld_blocks, cover,
+         robots=ROBOTS_INDEX, og_type="website"):
+    """Inizio della pagina: titolo, descrizione, lingue, anteprima social,
+    icone e dati strutturati. `cover` e' l'immagine per i social."""
     p = asset_prefix(folder)
     alternates = "\n".join(
         f'  <link rel="alternate" hreflang="{l}" href="{url_of(alt_dirs[l])}">' for l in LANGS)
+    verify = ""
+    if GOOGLE_SITE_VERIFICATION:
+        verify += f'\n  <meta name="google-site-verification" content="{attr(GOOGLE_SITE_VERIFICATION)}">'
+    if BING_SITE_VERIFICATION:
+        verify += f'\n  <meta name="msvalidate.01" content="{attr(BING_SITE_VERIFICATION)}">'
+    og_alternates = "".join(
+        f'\n  <meta property="og:locale:alternate" content="{T[l]["og_locale"]}">' for l in LANGS if l != lang)
+    if cover:
+        image = f"""
+  <meta property="og:image" content="{abs_url(cover["rel"])}">
+  <meta property="og:image:width" content="{cover["w"]}">
+  <meta property="og:image:height" content="{cover["h"]}">
+  <meta property="og:image:alt" content="{attr(photo_alt(cover["photo"], lang, 0))}">"""
+    else:
+        image = f'\n  <meta property="og:image" content="{SITE}assets/img/og-cover.svg">'
     ld = "\n\n".join(
         f"""  <!-- Dati strutturati: {name} -->
   <script type="application/ld+json">
@@ -989,22 +1812,25 @@ def head(lang, folder, alt_dirs, title, description, keywords, og_description, l
   <!-- Pagina generata da tools/build_pages.py: modifica i testi li', non qui. -->
   <title>{escape(title)}</title>
   <meta name="description" content="{attr(description)}">
-  <meta name="keywords" content="{attr(keywords)}">{extra_meta}
+  <meta name="robots" content="{robots}">{verify}
   <link rel="canonical" href="{url_of(folder)}">
 {alternates}
   <link rel="alternate" hreflang="x-default" href="{url_of(alt_dirs["it"])}">
 
-  <!-- Open Graph -->
-  <meta property="og:type" content="website">
+  <!-- Anteprima sui social e nelle chat (Open Graph) -->
+  <meta property="og:type" content="{og_type}">
   <meta property="og:title" content="{attr(title)}">
   <meta property="og:description" content="{attr(og_description)}">
-  <meta property="og:url" content="{url_of(folder)}">
-  <meta property="og:image" content="{SITE}assets/img/og-cover.svg">
-  <meta property="og:locale" content="{T[lang]["og_locale"]}">
+  <meta property="og:url" content="{url_of(folder)}">{image}
+  <meta property="og:locale" content="{T[lang]["og_locale"]}">{og_alternates}
   <meta property="og:site_name" content="B&amp;B Merì">
   <meta name="twitter:card" content="summary_large_image">
 
+  <meta name="theme-color" content="#f7f2ea">
+  <link rel="icon" href="{p}favicon.ico" sizes="32x32">
   <link rel="icon" href="{p}assets/img/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="{p}assets/img/apple-touch-icon.png">
+  <link rel="manifest" href="{p}site.webmanifest">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -1016,15 +1842,20 @@ def head(lang, folder, alt_dirs, title, description, keywords, og_description, l
 """
 
 
+def page_href(lang, folder, page, target):
+    """Link dal menu verso un'altra pagina (o "#top" se e' la pagina stessa)."""
+    if page == target:
+        return '"#top" aria-current="page"'
+    return f'"{rel(folder, PAGE_DIRS[target][lang])}"'
+
+
 def site_header(lang, folder, page):
-    """Intestazione con menu. `page` e' "home" oppure "parking"."""
+    """Intestazione con menu. `page`: "home", "parking", "guide" o "checkin"."""
     t = T[lang]
     ids, nav = t["ids"], t["nav"]
     p = asset_prefix(folder)
     home = "" if page == "home" else rel(folder, HOME_DIR[lang])
     dirs = PAGE_DIRS[page]
-    parking_href = "#top" if page == "parking" else rel(folder, PARK_DIR[lang])
-    current = ' aria-current="page"' if page == "parking" else ""
     lang_switch = "".join(
         f'<a href="{rel(folder, dirs[l])}" hreflang="{l}" lang="{l}"'
         + (' aria-current="page"' if l == lang else "")
@@ -1045,7 +1876,8 @@ def site_header(lang, folder, page):
         <li><a href="{home}#{ids["rooms"]}">{nav["rooms"]}</a></li>
         <li><a href="{home}#{ids["amenities"]}">{nav["amenities"]}</a></li>
         <li><a href="{home}#{ids["arrival"]}">{nav["arrival"]}</a></li>
-        <li><a href="{parking_href}"{current}>{nav["parking"]}</a></li>
+        <li><a href={page_href(lang, folder, page, "parking")}>{nav["parking"]}</a></li>
+        <li><a href={page_href(lang, folder, page, "guide")}>{nav["guide"]}</a></li>
         <li><a href="{home}#{ids["faq"]}">{nav["faq"]}</a></li>
         <li><a href="{home}#{ids["contact"]}" class="nav-cta">{nav["book"]}</a></li>
         <li class="lang-switch">{lang_switch}</li>
@@ -1062,7 +1894,6 @@ def site_footer(lang, folder, page):
     p = asset_prefix(folder)
     home = "" if page == "home" else rel(folder, HOME_DIR[lang])
     dirs = PAGE_DIRS[page]
-    parking_href = "#top" if page == "parking" else rel(folder, PARK_DIR[lang])
     whatsapp = f"https://wa.me/{WHATSAPP}?text={quote(t['whatsapp_text'])}"
     other_langs = "\n      ".join(
         f'<a href="{rel(folder, dirs[l])}" hreflang="{l}" lang="{l}">{T[l]["lang_name"]}</a>'
@@ -1082,7 +1913,8 @@ def site_footer(lang, folder, page):
       <a href="{home}#{ids["amenities"]}">{nav["amenities"]}</a>
       <a href="{home}#{ids["location"]}">{nav["location"]}</a>
       <a href="{home}#{ids["arrival"]}">{nav["arrival"]}</a>
-      <a href="{parking_href}">{nav["parking"]}</a>
+      <a href={page_href(lang, folder, page, "parking")}>{nav["parking"]}</a>
+      <a href={page_href(lang, folder, page, "guide")}>{nav["guide"]}</a>
       <a href="{home}#{ids["faq"]}">{nav["faq"]}</a>
       <a {checkin_attrs(lang, folder)}>{t["checkin_title"]}</a>
       {other_langs}
@@ -1101,13 +1933,43 @@ def site_footer(lang, folder, page):
 
 # --------------------------------------------------------- home page --
 
-def render_home(lang):
+def gallery_html(lang, folder, photos):
+    """Galleria della Camera Matrimoniale: tutte le foto sono nella pagina
+    (Google e gli assistenti AI le vedono), il JavaScript le fa scorrere."""
+    t = T[lang]
+    p = asset_prefix(folder)
+    if not photos:
+        return (f'          <figure class="room-media">\n'
+                f'            <img src="{p}assets/img/room-castello.svg" alt="{attr(t["room1"]["alt"])}" width="800" height="600" loading="lazy">\n'
+                f'          </figure>')
+    slides = []
+    for i, ph in enumerate(photos):
+        srcset = ", ".join(f"{p}{rel_path} {w}w" for rel_path, w in ph["variants"])
+        source = (f'<source type="image/webp" srcset="{srcset}" sizes="(max-width: 900px) 100vw, 520px">'
+                  if srcset else "")
+        hidden = "" if i == 0 else " hidden"
+        slides.append(
+            f'            <picture class="gallery-slide"{hidden}>{source}'
+            f'<img src="{p}{quote(ph["rel"])}" alt="{attr(photo_alt(ph, lang, i))}" '
+            f'width="{ph["w"]}" height="{ph["h"]}" loading="lazy" decoding="async"></picture>')
+    slides = "\n".join(slides)
+    return (f'          <figure class="room-media room-gallery" data-gallery aria-label="{attr(t["gallery_label"])}">\n'
+            f'{slides}\n'
+            f'          </figure>')
+
+
+def render_home(lang, photos, cover):
     t = T[lang]
     folder = HOME_DIR[lang]
     p = asset_prefix(folder)
     ids = t["ids"]
     r1, r2 = t["room1"], t["room2"]
     parking_href = rel(folder, PARK_DIR[lang])
+    guide_href = rel(folder, GUIDE_DIR[lang])
+    cover_url = abs_url(cover["rel"]) if cover else None
+    facts = "\n".join(
+        f"        <div><dt>{escape(label, quote=False)}</dt><dd>{escape(value, quote=False)}</dd></div>"
+        for label, value in t["facts"])
 
     badges = "\n".join(f"        <li>✓ {b}</li>" for b in t["badges"])
     intro = "\n".join(f"      <p>{para}</p>" for para in t["intro_p"])
@@ -1138,16 +2000,15 @@ def render_home(lang):
     whatsapp = f"https://wa.me/{WHATSAPP}?text={quote(t['whatsapp_text'])}"
     mailto = f"mailto:{EMAIL}?subject={quote(t['mail_subject'])}"
 
-    return head(lang, folder, HOME_DIR, t["title"], t["description"], t["keywords"],
-                t["og_description"], structured_data(lang, t)) \
+    return head(lang, folder, HOME_DIR, t["title"], t["description"], t["og_description"],
+                home_structured_data(lang, photos, cover_url), cover) \
         + site_header(lang, folder, "home") + f"""
 <main>
 
   <!-- HERO -->
   <section class="hero">
     <div class="container hero-inner">
-      <p class="hero-eyebrow">{t["hero_eyebrow"]}</p>
-      <h1>{t["h1"]}</h1>
+      <h1><span class="hero-eyebrow">{t["hero_eyebrow"]}</span> {t["h1"]}</h1>
       <a class="checkin-cta" {checkin_attrs(lang, folder)}>
         <span class="checkin-icon" aria-hidden="true">🗝️</span>
         <span class="checkin-text">
@@ -1176,6 +2037,10 @@ def render_home(lang):
       <p class="eyebrow">{t["intro_eyebrow"]}</p>
       <h2>{t["intro_h2"]}</h2>
 {intro}
+      <h3 class="facts-title">{t["facts_title"]}</h3>
+      <dl class="facts-grid">
+{facts}
+      </dl>
     </div>
   </section>
 
@@ -1187,9 +2052,7 @@ def render_home(lang):
       <div class="rooms-grid">
 
         <article class="room-card">
-          <figure class="room-media room-gallery" data-gallery="assets/img/camera-matrimoniale" data-gallery-base="{p}assets/img/camera-matrimoniale/">
-            <img src="{p}assets/img/room-castello.svg" alt="{attr(r1["alt"])}" width="800" height="600" loading="lazy">
-          </figure>
+{gallery_html(lang, folder, photos)}
           <div class="room-body">
             <h3>{r1["name"]}</h3>
             <p class="room-tagline">{r1["tagline"]}</p>
@@ -1242,6 +2105,7 @@ def render_home(lang):
         <ul class="distances">
 {distances}
         </ul>
+        <p class="guide-link"><a class="text-link" href="{guide_href}">{t["guide_link"]}</a></p>
         <a class="btn btn-primary" href="{MAPS_URL}" target="_blank" rel="noopener">{t["maps_button"]}</a>
       </div>
       <figure class="location-media" aria-hidden="true">
@@ -1295,7 +2159,7 @@ def render_home(lang):
 
 # ------------------------------------------------- pagina parcheggi --
 
-def render_parking(lang):
+def render_parking(lang, photos, cover):
     t, pt = T[lang], P[lang]
     folder = PARK_DIR[lang]
     home = rel(folder, HOME_DIR[lang])
@@ -1355,8 +2219,8 @@ def render_parking(lang):
     sources = " · ".join(
         f'<a href="{attr(url)}" target="_blank" rel="noopener">{escape(label)}</a>' for label, url in SOURCES)
 
-    return head(lang, folder, PARK_DIR, pt["title"], pt["description"], pt["keywords"],
-                pt["og_description"], parking_structured_data(lang, pt)) \
+    return head(lang, folder, PARK_DIR, pt["title"], pt["description"], pt["og_description"],
+                parking_structured_data(lang, pt, photos), cover) \
         + site_header(lang, folder, "parking") + f"""
 <main class="parking-page">
 
@@ -1425,6 +2289,112 @@ def render_parking(lang):
 
 </main>
 """ + site_footer(lang, folder, "parking")
+
+
+# ---------------------------------------- pagina "cosa vedere" --
+
+MODE_ICON = {"walking": "🚶", "transit": "🚌", "driving": "🚗"}
+
+
+def render_guide(lang, photos, cover):
+    t, gt = T[lang], G[lang]
+    folder = GUIDE_DIR[lang]
+    home = rel(folder, HOME_DIR[lang])
+    parking_href = rel(folder, PARK_DIR[lang])
+    btn = gt["buttons"]
+    whatsapp = f"https://wa.me/{WHATSAPP}?text={quote(t['whatsapp_text'])}"
+    cover_url = abs_url(cover["rel"]) if cover else None
+
+    def card(key, badge):
+        name, time, text = gt["stops"][key]
+        s = STOPS[key]
+        return f"""        <li class="stop-card" id="{key.replace("_", "-")}">
+          <span class="stop-badge" aria-hidden="true">{badge}</span>
+          <div class="stop-body">
+            <div class="stop-head">
+              <h3>{name}</h3>
+              <span class="stop-time">{time}</span>
+            </div>
+            <p>{text}</p>
+            <div class="park-actions">
+              <a class="btn btn-outline btn-sm" href="{attr(maps_from_bnb(s["map"], s["mode"]))}" target="_blank" rel="noopener">{MODE_ICON[s["mode"]]} {btn["route"]}</a>
+              <a class="btn btn-ghost btn-sm" href="{attr(maps_search(s["map"]))}" target="_blank" rel="noopener">🗺️ {btn["open"]}</a>
+            </div>
+          </div>
+        </li>"""
+
+    route_keys = [k for k, s in STOPS.items() if s["group"] == "castello"]
+    route = "\n".join(card(k, i + 1) for i, k in enumerate(route_keys))
+    beyond = "\n".join(card(k, STOPS[k]["icon"]) for k, s in STOPS.items() if s["group"] == "beyond")
+    tips = "\n".join(
+        f"""        <li><span class="tip-icon" aria-hidden="true">{icon}</span><div><strong>{title}</strong><p>{text.replace("{parking}", parking_href)}</p></div></li>"""
+        for icon, title, text in gt["tips"])
+
+    return head(lang, folder, GUIDE_DIR, gt["title"], gt["description"], gt["og_description"],
+                guide_structured_data(lang, gt, photos, cover_url), cover, og_type="article") \
+        + site_header(lang, folder, "guide") + f"""
+<main class="guide-page">
+
+  <section class="page-hero">
+    <div class="container narrow">
+      <a class="back-link" href="{home}">← {P[lang]["back"]}</a>
+      <p class="hero-eyebrow">{gt["eyebrow"]}</p>
+      <h1>{gt["h1"]}</h1>
+      <p class="hero-sub">{gt["intro"]}</p>
+      <div class="satnav-tip">
+        <span class="satnav-icon" aria-hidden="true">👟</span>
+        <div>
+          <strong>{gt["before_title"]}</strong>
+          <p>{gt["before_text"]}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section-alt">
+    <div class="container narrow">
+      <h2>{gt["route_title"]}</h2>
+      <p class="tab-intro">{gt["route_intro"]}</p>
+      <ol class="stop-list">
+{route}
+      </ol>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container narrow">
+      <h2>{gt["beyond_title"]}</h2>
+      <p class="tab-intro">{gt["beyond_intro"]}</p>
+      <ul class="stop-list">
+{beyond}
+      </ul>
+    </div>
+  </section>
+
+  <section class="section section-alt">
+    <div class="container narrow">
+      <h2>{gt["tips_title"]}</h2>
+      <ul class="tip-list">
+{tips}
+      </ul>
+      <p class="parking-updated guide-updated">{gt["updated"]}</p>
+    </div>
+  </section>
+
+  <section class="contact section section-dark">
+    <div class="container narrow center">
+      <h2>{gt["help_title"]}</h2>
+      <p>{gt["help_text"]}</p>
+      <div class="contact-actions">
+        <a class="btn btn-primary btn-lg" href="{attr(whatsapp)}" target="_blank" rel="noopener">💬 WhatsApp</a>
+        <a class="btn btn-ghost btn-lg" href="tel:{TEL}">📞 {t["phone_label"]}</a>
+        <a class="btn btn-ghost btn-lg" href="{home}">← {P[lang]["back"]}</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+""" + site_footer(lang, folder, "guide")
 
 
 # ------------------------------------------------ pagina check-in --
@@ -1654,7 +2624,7 @@ def guest_fields(c, i, main):
     return "\n            ".join(rows)
 
 
-def render_checkin(lang):
+def render_checkin(lang, cover):
     t, c = T[lang], C[lang]
     folder = CHECKIN_DIR[lang]
     home = rel(folder, HOME_DIR[lang])
@@ -1676,8 +2646,8 @@ def render_checkin(lang):
     messages = json.dumps({k: c[k] for k in ("sending", "err_file", "err_dates", "s_guest")},
                           ensure_ascii=False)
 
-    return head(lang, folder, CHECKIN_DIR, c["title"], c["description"], "", c["description"], [],
-                extra_meta='\n  <meta name="robots" content="noindex">') \
+    return head(lang, folder, CHECKIN_DIR, c["title"], c["description"], c["description"], [],
+                cover, robots="noindex") \
         + site_header(lang, folder, "checkin") + f"""
 <main class="checkin-page">
 
@@ -1767,42 +2737,179 @@ def render_checkin(lang):
 """ + site_footer(lang, folder, "checkin")
 
 
+# ------------------------------------------ date di ultima modifica --
+#
+# tools/lastmod.json ricorda, per ogni pagina, l'impronta del contenuto e la
+# data in cui e' cambiato l'ultima volta. Cosi' la sitemap e i dati strutturati
+# dicono a Google e Bing la data vera, e solo quando qualcosa cambia davvero.
+
+LASTMOD_FILE = ROOT / "tools" / "lastmod.json"
+VERSION_RE = re.compile(r"\?v=[0-9a-f]{8}")
+
+
+def stamp_lastmod(url, html, store):
+    digest = hashlib.sha1(VERSION_RE.sub("", html).encode("utf-8")).hexdigest()
+    record = store.get(url)
+    if not record or record.get("sha1") != digest:
+        record = {"date": today(), "sha1": digest}
+        store[url] = record
+    return html.replace(LASTMOD_TOKEN, record["date"]), record["date"]
+
+
 # --------------------------------------------------------------- sitemap --
 
-def sitemap():
-    def entry(dirs, lang, priority):
+def sitemap(dates, photos):
+    images = "".join(
+        f"\n    <image:image><image:loc>{escape(abs_url(ph['rel']))}</image:loc></image:image>"
+        for ph in photos)
+
+    def entry(dirs, lang, extra=""):
+        url = url_of(dirs[lang])
         alternates = "".join(
             f'\n    <xhtml:link rel="alternate" hreflang="{l}" href="{url_of(dirs[l])}"/>' for l in LANGS)
         alternates += f'\n    <xhtml:link rel="alternate" hreflang="x-default" href="{url_of(dirs["it"])}"/>'
         return f"""
   <url>
-    <loc>{url_of(dirs[lang])}</loc>
-    <lastmod>{LASTMOD}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>{priority}</priority>{alternates}
+    <loc>{url}</loc>
+    <lastmod>{dates[url]}</lastmod>{alternates}{extra}
   </url>"""
-    urls = "".join(entry(HOME_DIR, l, "1.0" if l == "it" else "0.9") for l in LANGS)
-    urls += "".join(entry(PARK_DIR, l, "0.8") for l in LANGS)
+
+    urls = "".join(entry(HOME_DIR, l, images) for l in LANGS)
+    urls += "".join(entry(PARK_DIR, l) for l in LANGS)
+    urls += "".join(entry(GUIDE_DIR, l) for l in LANGS)
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-        xmlns:xhtml="http://www.w3.org/1999/xhtml">{urls}
+        xmlns:xhtml="http://www.w3.org/1999/xhtml"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">{urls}
 </urlset>
 """
 
 
+# -------------------------------------------------------------- llms.txt --
+#
+# Riassunto in testo semplice per gli assistenti AI (ChatGPT, Claude,
+# Perplexity, Gemini...). E' generato dagli stessi dati delle pagine, cosi'
+# non resta mai indietro rispetto al sito.
+
+def llms_txt(photos, dates):
+    it, en = T["it"], T["en"]
+    months = ["January", "February", "March", "April", "May", "June", "July",
+              "August", "September", "October", "November", "December"]
+    year, month = PARKING_CHECKED.split("-")
+    checked = f"{months[int(month) - 1]} {year}"
+
+    def lines(rows):
+        return "\n".join(rows)
+
+    def faq(t):
+        return lines(f"- **{q}** {a}" for q, a in t["faq"])
+
+    def facts(t):
+        return lines(f"- {label}: {value}" for label, value in t["facts"])
+
+    parking = []
+    for key in SPOTS:
+        name, badge, spot_facts, text = P["en"]["spots"][key]
+        details = "; ".join(f"{plain(label)}: {plain(value)}" for label, value in spot_facts)
+        parking.append(f"- **{plain(name)}** ({plain(badge)}): {details}. {plain(text)}")
+    arrival = [f"- **{plain(title)}**: {plain(text.replace('{parking}', url_of(PARK_DIR['en'])))}"
+               for _, title, text in en["arrival"]]
+    distances = [f"- {place}: {time}" for place, time in en["distances"]]
+    stops = [f"- **{name}** ({time}): {plain(text)}" for name, time, text in G["en"]["stops"].values()]
+    photo_rows = [f"- [{photo_alt(ph, 'en', i)}]({abs_url(ph['rel'])})" for i, ph in enumerate(photos)]
+
+    pages = []
+    for l in LANGS:
+        pages.append(f"- [Home — {T[l]['lang_name']}]({url_of(HOME_DIR[l])}): {T[l]['description']}")
+    for l in LANGS:
+        pages.append(f"- [{plain(P[l]['h1'].replace('<br>', ' '))} — {T[l]['lang_name']}]({url_of(PARK_DIR[l])}): {P[l]['description']}")
+    for l in LANGS:
+        pages.append(f"- [{plain(G[l]['h1'].replace('<br>', ' '))} — {T[l]['lang_name']}]({url_of(GUIDE_DIR[l])}): {G[l]['description']}")
+    checkin = url_of(CHECKIN_DIR["it"]) if CHECKIN_FORM_LIVE else CHECKIN_URL
+    pages.append(f"- [Check-in online]({checkin}): modulo per gli ospiti che hanno già prenotato / form for guests who have already booked")
+    if SAME_AS:
+        pages += [f"- [{u}]({u})" for u in SAME_AS]
+
+    return f"""# B&B Merì
+
+> {it["ld_description"]}
+> {en["ld_description"]}
+
+Sito ufficiale / Official website: {SITE} (italiano, English, français, español).
+Aggiornato il / Last updated: {max(dates.values())}.
+
+## In breve (italiano)
+
+{facts(it)}
+
+## At a glance (English)
+
+{facts(en)}
+
+## Domande frequenti (italiano)
+
+{faq(it)}
+
+## Frequently asked questions (English)
+
+{faq(en)}
+
+## Getting here (English)
+
+{lines(arrival)}
+
+## Location: walking times from the B&B (English)
+
+{lines(distances)}
+
+## Parking near Castello (checked {checked}; prices may change)
+
+{lines(parking)}
+
+## Things to see on foot from the B&B (English)
+
+{lines(stops)}
+
+## Foto della Camera Matrimoniale / Photos of the Double Room
+
+{lines(photo_rows)}
+
+## Pagine / Pages
+
+{lines(pages)}
+"""
+
+
+def write_page(folder, html):
+    path = ROOT / folder / "index.html"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(html, encoding="utf-8")
+    print("scritto", path.relative_to(ROOT))
+
+
 def main():
     with_checkin = CHECKIN_FORM_LIVE or os.environ.get("MERI_PREVIEW") == "1"
+    photos = gallery_photos()
+    cover = optimize_photos(photos)
+    store = json.loads(LASTMOD_FILE.read_text(encoding="utf-8")) if LASTMOD_FILE.exists() else {}
+    dates = {}
     for lang in LANGS:
-        pages = [(HOME_DIR[lang], render_home(lang)), (PARK_DIR[lang], render_parking(lang))]
-        if with_checkin:
-            pages.append((CHECKIN_DIR[lang], render_checkin(lang)))
+        pages = [(HOME_DIR[lang], render_home(lang, photos, cover)),
+                 (PARK_DIR[lang], render_parking(lang, photos, cover)),
+                 (GUIDE_DIR[lang], render_guide(lang, photos, cover))]
         for folder, html in pages:
-            path = ROOT / folder / "index.html"
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(html, encoding="utf-8")
-            print("scritto", path.relative_to(ROOT))
-    (ROOT / "sitemap.xml").write_text(sitemap(), encoding="utf-8")
+            html, dates[url_of(folder)] = stamp_lastmod(url_of(folder), html, store)
+            write_page(folder, html)
+        if with_checkin:
+            write_page(CHECKIN_DIR[lang], render_checkin(lang, cover))
+
+    store = {url: store[url] for url in sorted(dates)}
+    LASTMOD_FILE.write_text(json.dumps(store, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    (ROOT / "sitemap.xml").write_text(sitemap(dates, photos), encoding="utf-8")
     print("scritto sitemap.xml")
+    (ROOT / "llms.txt").write_text(llms_txt(photos, dates), encoding="utf-8")
+    print("scritto llms.txt")
+    (ROOT / f"{INDEXNOW_KEY}.txt").write_text(INDEXNOW_KEY, encoding="utf-8")
 
 
 if __name__ == "__main__":

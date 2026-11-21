@@ -1,0 +1,77 @@
+# Aggiorna il sito da solo.
+#
+# A ogni modifica sul ramo main (testi in tools/build_pages.py, foto nuove,
+# ordine.txt...):
+#   1. rigenera pagine, foto ottimizzate, sitemap e llms.txt (tools/build_pages.py)
+#   2. controlla che tutto sia in regola per Google e le AI (tools/check_seo.py)
+#   3. salva le pagine rigenerate con un commit automatico e fa ripubblicare il sito
+#   4. quando il sito pubblicato e' aggiornato, avvisa Bing & co. (tools/indexnow.py)
+#
+# Il primo giorno di ogni mese rifa' i controlli e segnala (con un'email di
+# GitHub) se le tariffe dei parcheggi vanno ricontrollate.
+# Si puo' anche lanciare a mano: scheda Actions -> "Aggiorna sito" -> Run workflow.
+
+name: Aggiorna sito
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: "23 7 1 * *"
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: aggiorna-sito
+  cancel-in-progress: false
+
+jobs:
+  aggiorna:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installa Pillow (per le foto ottimizzate)
+        run: pip install --quiet pillow
+
+      - name: Rigenera le pagine
+        run: python3 tools/build_pages.py
+
+      - name: Controlli SEO
+        run: python3 tools/check_seo.py ${{ github.event_name == 'schedule' && '--strict-dates' || '' }}
+
+      - name: Salva le pagine rigenerate
+        id: commit
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "Aggiorna pagine generate (automatico)"
+            git push
+            echo "pushed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Un commit fatto da GitHub Actions a volte non fa ripartire la
+      # pubblicazione di GitHub Pages: la chiediamo esplicitamente.
+      - name: Ripubblica il sito
+        if: steps.commit.outputs.pushed == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X POST "repos/${{ github.repository }}/pages/builds" --silent
+
+      - name: Avvisa i motori di ricerca (IndexNow)
+        if: github.event_name != 'schedule'
+        run: python3 tools/indexnow.py --since "${{ github.event.before }}" --wait

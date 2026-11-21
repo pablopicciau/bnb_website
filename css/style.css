@@ -124,8 +124,11 @@ h3 { font-size: 1.4rem; }
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 1rem;
   padding-block: 0.85rem;
 }
+/* Intestazione un po' piu' larga del resto: il menu ha 7 voci + lingue */
+.site-header .header-inner { max-width: 1240px; }
 
 .logo {
   display: flex;
@@ -165,7 +168,7 @@ h3 { font-size: 1.4rem; }
 .nav-menu {
   display: flex;
   align-items: center;
-  gap: 1.35rem;
+  gap: 1.1rem;
   list-style: none;
 }
 
@@ -174,6 +177,7 @@ h3 { font-size: 1.4rem; }
   color: var(--ink-soft);
   font-weight: 500;
   font-size: 0.95rem;
+  white-space: nowrap;
 }
 .nav-menu a:hover { color: var(--terracotta); }
 
@@ -238,6 +242,12 @@ h3 { font-size: 1.4rem; }
   letter-spacing: 0.2em;
   color: var(--terracotta);
   margin-bottom: 1.2rem;
+}
+/* Nella home l'occhiello fa parte del titolo (H1): stesso aspetto */
+h1 .hero-eyebrow {
+  display: block;
+  font-family: var(--font-body);
+  line-height: 1.7;
 }
 
 /* Check-in online: grande pulsante sotto il titolo */
@@ -338,6 +348,39 @@ h3 { font-size: 1.4rem; }
 
 .intro p + p { margin-top: 1rem; }
 
+/* "In breve": i dati essenziali, facili da leggere per ospiti, Google e AI */
+.facts-title {
+  margin-top: 2.4rem;
+  font-size: 1.25rem;
+  color: var(--sea);
+}
+.facts-grid {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr));
+  gap: 0.8rem;
+}
+.facts-grid div {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0.9rem 1.1rem;
+}
+.facts-grid dt {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--terracotta);
+}
+.facts-grid dd {
+  margin-top: 0.2rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
 /* ---------- Rooms ---------- */
 
 .rooms-grid {
@@ -382,8 +425,10 @@ h3 { font-size: 1.4rem; }
   border-radius: 999px;
 }
 
-/* Galleria foto camera (le foto si caricano da assets/img/camera-matrimoniale/) */
+/* Galleria foto camera (le foto sono nella pagina, generate dallo script) */
 /* Foto intere, senza tagli: quelle verticali hanno bande ai lati */
+.gallery-slide { display: block; }
+.gallery-slide[hidden] { display: none; }
 .room-gallery img {
   object-fit: contain;
   background: var(--sand-deep);
@@ -506,6 +551,8 @@ h3 { font-size: 1.4rem; }
   font-size: 0.98rem;
 }
 .distances span { color: var(--ink-soft); white-space: nowrap; }
+
+.guide-link { margin: -0.6rem 0 1.6rem; }
 
 .location-media img {
   border-radius: var(--radius);
@@ -847,6 +894,68 @@ button.btn-outline { background: transparent; }
 .parking-source-list { margin-top: 0.6rem; font-size: 0.85rem; color: var(--ink-soft); }
 .parking-source-list a { color: var(--sea); }
 
+/* ---------- Guida "cosa vedere" ---------- */
+
+.stop-list {
+  list-style: none;
+  display: grid;
+  gap: 1.1rem;
+  margin-top: 1.4rem;
+}
+.stop-card {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.4rem 1.5rem;
+  scroll-margin-top: 100px;
+}
+.section-alt .stop-card { background: var(--sand); }
+.stop-badge {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--sea);
+  color: var(--sand);
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1;
+}
+.stop-body { flex: 1; min-width: 0; }
+.stop-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.3rem 0.8rem;
+  margin-bottom: 0.5rem;
+}
+.stop-head h3 { font-size: 1.3rem; }
+.stop-time {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  background: #dceaee;
+  color: var(--sea);
+  white-space: nowrap;
+}
+.stop-card p { color: var(--ink-soft); font-size: 0.97rem; }
+.guide-updated { margin-top: 1.6rem; font-size: 0.95rem; }
+
+@media (max-width: 560px) {
+  .stop-card { padding: 1.2rem 1.1rem; gap: 0.8rem; }
+  .stop-badge { width: 36px; height: 36px; font-size: 1.05rem; }
+}
+
 /* ---------- Check-in online ---------- */
 
 .checkin-form fieldset {
@@ -959,9 +1068,9 @@ button.btn-outline { background: transparent; }
   .checkin-form fieldset { padding: 1.2rem 1.1rem 1.4rem; }
 }
 
-/* Menu a tendina: scatta prima dei 720px perche' con 4 lingue
-   le voci (es. spagnolo/francese) non stanno su una riga */
-@media (max-width: 1100px) {
+/* Menu a tendina: scatta gia' sotto i 1180px perche' con 7 voci e
+   4 lingue il menu (soprattutto in italiano e spagnolo) non sta su una riga */
+@media (max-width: 1180px) {
   .nav-toggle { display: flex; }
 
   .nav-menu {

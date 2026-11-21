@@ -1,0 +1,10 @@
+# Impostazioni di GitHub Pages (Jekyll).
+# I file elencati restano nel repository ma NON vengono pubblicati sul sito:
+# sono strumenti e documenti interni, inutili (o fuorvianti) per i visitatori
+# e per i motori di ricerca.
+exclude:
+  - README.md
+  - docs
+  - tools
+  - assets/img/camera-matrimoniale/LEGGIMI.md
+  - assets/img/camera-matrimoniale/ordine.txt
