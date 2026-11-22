@@ -143,6 +143,10 @@ Booking) e può penalizzarle.
 
 > Tempo totale: circa mezza giornata, più la verifica postale/telefonica di
 > Google che può richiedere qualche giorno.
+>
+> Dati e testi pronti da copiare nelle schede (descrizione per Google, bio,
+> messaggio per le recensioni, elenco delle pagine da indicizzare):
+> [`schede-profili.md`](schede-profili.md).
 
 ### 1. Pubblicare le modifiche e sistemare GitHub (10 minuti)
 1. Unire il ramo `claude/seo-motori-ricerca-ai` a `main` (pull request →
