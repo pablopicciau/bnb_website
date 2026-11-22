@@ -144,18 +144,19 @@ Booking) e può penalizzarle.
 > Tempo totale: circa mezza giornata, più la verifica postale/telefonica di
 > Google che può richiedere qualche giorno.
 
-### 1. Pubblicare le modifiche e sistemare GitHub (15 minuti)
-1. Le modifiche sono sul ramo `claude/seo-motori-ricerca-ai`: unitelo a
-   `main` (pull request → *Merge*).
+### 1. Pubblicare le modifiche e sistemare GitHub (10 minuti)
+1. Unire il ramo `claude/seo-motori-ricerca-ai` a `main` (pull request →
+   *Merge*): GitHub Pages pubblica il sito dal ramo `main`.
 2. **Settings → General → Default branch**: impostate `main` (oggi il ramo
    predefinito è un ramo di lavoro `claude/...`, e il controllo mensile
    automatico parte solo dal ramo predefinito).
-3. **Settings → Actions → General → Workflow permissions**: "Read and write
-   permissions" (serve all'aggiornamento automatico per salvare le pagine).
-4. **Settings → Pages**: controllate che la pubblicazione sia dal ramo `main`
-   e che "Enforce HTTPS" sia attivo.
-5. Aprite `https://meribnb.it` (senza www): deve portare a
+3. **Settings → Pages**: controllate che "Enforce HTTPS" sia attivo.
+4. Aprite `https://meribnb.it` (senza www): deve portare a
    `https://www.meribnb.it/`. Se non lo fa, va sistemato il DNS del dominio.
+5. Scheda **Actions**: dopo ogni modifica deve comparire "Aggiorna sito" con
+   la spunta verde. Solo se fallisce al passo "Salva le pagine rigenerate" per
+   un problema di permessi: **Settings → Actions → General → Workflow
+   permissions** → "Read and write permissions".
 
 ### 2. Google Search Console (30 minuti) — priorità massima
 1. Andate su search.google.com/search-console e aggiungete la proprietà
