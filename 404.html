@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pagina non trovata — B&B Merì</title>
   <meta name="robots" content="noindex">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
   <link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,6 +22,7 @@
       gap: 0.5rem;
       padding-block: 4rem;
     }
+    .nf-langs { margin-top: 2rem; font-size: 0.95rem; line-height: 2; }
     .nf-code {
       font-family: var(--font-display);
       font-size: clamp(4rem, 14vw, 8rem);
@@ -39,8 +41,10 @@
     <nav class="main-nav" aria-label="Navigazione principale">
       <ul class="nav-menu">
         <li><a href="/#stanze">Le Stanze</a></li>
+        <li><a href="/parcheggi/">Parcheggi</a></li>
+        <li><a href="/cosa-vedere-a-castello/">Cosa vedere</a></li>
         <li><a href="/#contatti" class="nav-cta">Prenota</a></li>
-        <li class="lang-switch"><a href="/en/" hreflang="en" lang="en">EN</a></li>
+        <li class="lang-switch"><a href="/en/" hreflang="en" lang="en">EN</a><a href="/fr/" hreflang="fr" lang="fr">FR</a><a href="/es/" hreflang="es" lang="es">ES</a></li>
       </ul>
     </nav>
   </div>
@@ -55,6 +59,11 @@
       <a href="/" class="btn btn-primary">Vai alla home</a>
       <a href="/#contatti" class="btn btn-ghost">Contattaci</a>
     </div>
+    <p class="nf-langs">
+      <a href="/en/" hreflang="en" lang="en">Page not found — go to the home page</a><br>
+      <a href="/fr/" hreflang="fr" lang="fr">Page introuvable — retour à l'accueil</a><br>
+      <a href="/es/" hreflang="es" lang="es">Página no encontrada — ir a la página principal</a>
+    </p>
   </div>
 </main>
 

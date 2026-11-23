@@ -19,15 +19,11 @@
   });
 })();
 
-// Galleria: mostra tutte le foto presenti nella cartella indicata da
-// data-gallery (es. assets/img/camera-matrimoniale/). L'elenco dei file
-// arriva dall'API pubblica di GitHub, quindi basta caricare le foto nella
-// cartella: niente nomi obbligatori. L'ordine si decide in ordine.txt
-// nella stessa cartella. Senza foto resta l'illustrazione.
+// Galleria: le foto sono gia' nella pagina (le mette tools/build_pages.py,
+// cosi' le vedono anche Google e gli assistenti AI); qui si aggiungono le
+// frecce, il contatore e lo scorrimento col dito. Senza JavaScript si vede
+// la prima foto.
 (function () {
-  var REPO = 'pablopicciau/bnb_website';
-  var BRANCH = 'main';
-  var IMAGE = /\.(jpe?g|png|webp|gif)$/i;
   var LABELS = {
     it: ['Foto precedente', 'Foto successiva'],
     en: ['Previous photo', 'Next photo'],
@@ -36,93 +32,57 @@
   }[document.documentElement.lang] || ['Foto precedente', 'Foto successiva'];
 
   document.querySelectorAll('[data-gallery]').forEach(function (fig) {
-    var folder = fig.getAttribute('data-gallery');   // percorso nel repo
-    var base = fig.getAttribute('data-gallery-base'); // percorso relativo alla pagina
-    var img = fig.querySelector('img');
-    if (!img || !window.fetch) return;
-
-    var list = fetch('https://api.github.com/repos/' + REPO + '/contents/' + folder + '?ref=' + BRANCH)
-      .then(function (res) { return res.ok ? res.json() : []; });
-    // ordine.txt (facoltativo): un nome di file per riga, nell'ordine voluto;
-    // quello dopo "#" e' un commento. Il parametro evita la versione in cache.
-    var order = fetch(base + 'ordine.txt?t=' + Date.now())
-      .then(function (res) { return res.ok ? res.text() : ''; })
-      .catch(function () { return ''; });
-
-    Promise.all([list, order])
-      .then(function (r) {
-        var files = r[0], wanted = parseOrder(r[1]);
-        var names = (Array.isArray(files) ? files : [])
-          .filter(function (f) { return f.type === 'file' && IMAGE.test(f.name); })
-          .map(function (f) { return f.name; })
-          .sort(function (a, b) {
-            var ia = rank(wanted, a), ib = rank(wanted, b);
-            return ia !== ib ? ia - ib : a.localeCompare(b, undefined, { numeric: true });
-          });
-        var photos = names.map(function (name) { return base + encodeURIComponent(name); });
-        if (photos.length) start(fig, img, photos);
-      })
-      .catch(function () { /* resta l'illustrazione */ });
-  });
-
-  // Nomi elencati in ordine.txt, in minuscolo (le maiuscole non contano)
-  function parseOrder(text) {
-    return text.split(/\r?\n/)
-      .map(function (line) { return line.split('#')[0].trim().toLowerCase(); })
-      .filter(Boolean);
-  }
-
-  // Posizione nell'elenco; le foto non elencate vanno in fondo
-  function rank(wanted, name) {
-    var i = wanted.indexOf(name.toLowerCase());
-    return i === -1 ? wanted.length : i;
-  }
-
-  function start(fig, img, photos) {
+    var slides = Array.prototype.slice.call(fig.querySelectorAll('.gallery-slide'));
+    if (slides.length < 2) return;
     var i = 0;
-    var fallback = img.getAttribute('src');
     var count = document.createElement('span');
     count.className = 'gallery-count';
+    count.setAttribute('aria-live', 'polite');
+
+    // Carica in anticipo la foto successiva, cosi' il cambio e' immediato
+    function preload(n) {
+      var img = slides[(n + slides.length) % slides.length].querySelector('img');
+      if (img) img.loading = 'eager';
+    }
 
     function show(n) {
-      i = (n + photos.length) % photos.length;
-      img.src = photos[i];
-      count.textContent = (i + 1) + ' / ' + photos.length;
+      slides[i].hidden = true;
+      i = (n + slides.length) % slides.length;
+      slides[i].hidden = false;
+      count.textContent = (i + 1) + ' / ' + slides.length;
+      preload(i + 1);
     }
 
-    // Se una foto non si carica (es. appena caricata, sito non ancora aggiornato), la salta
-    img.addEventListener('error', function onError() {
-      photos.splice(i, 1);
-      if (photos.length) return show(i);
-      img.removeEventListener('error', onError);
-      img.src = fallback;
-      fig.querySelectorAll('.gallery-btn, .gallery-count').forEach(function (el) { el.remove(); });
+    ['prev', 'next'].forEach(function (dir) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'gallery-btn gallery-' + dir;
+      b.setAttribute('aria-label', LABELS[dir === 'prev' ? 0 : 1]);
+      b.textContent = dir === 'prev' ? '‹' : '›';
+      b.addEventListener('click', function () { show(i + (dir === 'prev' ? -1 : 1)); });
+      fig.appendChild(b);
+    });
+    fig.appendChild(count);
+
+    // Scorrimento col dito su telefono
+    var x0 = null;
+    fig.addEventListener('touchstart', function (e) { x0 = e.touches[0].clientX; }, { passive: true });
+    fig.addEventListener('touchend', function (e) {
+      if (x0 === null) return;
+      var dx = e.changedTouches[0].clientX - x0;
+      if (Math.abs(dx) > 40) show(i + (dx < 0 ? 1 : -1));
+      x0 = null;
     });
 
-    if (photos.length > 1) {
-      ['prev', 'next'].forEach(function (dir) {
-        var b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'gallery-btn gallery-' + dir;
-        b.setAttribute('aria-label', LABELS[dir === 'prev' ? 0 : 1]);
-        b.textContent = dir === 'prev' ? '‹' : '›';
-        b.addEventListener('click', function () { show(i + (dir === 'prev' ? -1 : 1)); });
-        fig.appendChild(b);
-      });
-      fig.appendChild(count);
-
-      // Scorrimento col dito su telefono
-      var x0 = null;
-      fig.addEventListener('touchstart', function (e) { x0 = e.touches[0].clientX; }, { passive: true });
-      fig.addEventListener('touchend', function (e) {
-        if (x0 === null) return;
-        var dx = e.changedTouches[0].clientX - x0;
-        if (Math.abs(dx) > 40) show(i + (dx < 0 ? 1 : -1));
-        x0 = null;
-      });
+    // Prima foto visibile; la seconda si prepara solo quando la galleria
+    // entra nello schermo
+    count.textContent = '1 / ' + slides.length;
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(function (entries, obs) {
+        if (entries[0].isIntersecting) { preload(1); obs.disconnect(); }
+      }).observe(fig);
     }
-    show(0);
-  }
+  });
 })();
 
 // Pagina parcheggi: schede (gratuiti / a pagamento / ascensori / consigli)
